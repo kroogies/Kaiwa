@@ -7,7 +7,7 @@ them with spaced repetition — free, private, and offline-first.
 No subscriptions. Your conversations never leave your machine (unless *you*
 plug in a cloud AI key — see below).
 
-> **Platforms:** macOS today. Windows support is planned — watch the issues.
+> **Platforms:** macOS, and Windows (beta — feedback welcome!).
 
 ## What it does
 
@@ -61,13 +61,32 @@ and takes ~30s to warm up. Voice input additionally needs whisper.cpp:
 brew install whisper-cpp
 ```
 
+## Install (Windows — beta)
+
+1. Install [Python 3.11+](https://www.python.org/downloads/) — tick **"Add python.exe to PATH"**
+2. Install [Ollama for Windows](https://ollama.com/download/windows) (skip if you'll use a cloud API key)
+3. Clone this repo, then in the folder:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File setup.ps1   # deps + speech model + dictionary + whisper.cpp
+powershell -ExecutionPolicy Bypass -File run.ps1     # starts everything → http://localhost:8130
+```
+
+For spoken replies without VOICEVOX, add a Japanese voice to Windows:
+Settings → Time & Language → Language → add **日本語** with the Speech option.
+
 ### Better voices (optional)
 
-Out of the box Kaiwa speaks with macOS's built-in Kyoko voice. For much nicer
-Japanese voices, download the [VOICEVOX engine](https://github.com/VOICEVOX/voicevox_engine/releases)
-(macOS x64 CPU build) and unzip it to `vendor/macos-x64/` so that
-`vendor/macos-x64/run` exists. `run.sh` will pick it up automatically, and a
-voice picker (with preview) appears in Settings.
+Out of the box Kaiwa speaks with your OS's built-in Japanese voice (Kyoko on
+macOS, Haruka on Windows). For much nicer voices, download the
+[VOICEVOX engine](https://github.com/VOICEVOX/voicevox_engine/releases)
+CPU build for your platform and unzip it so that this file exists:
+
+- macOS: `vendor/macos-x64/run`
+- Windows: `vendor\windows-cpu\run.exe`
+
+The launcher picks it up automatically, and a voice picker (with preview)
+appears in Settings.
 
 ## Use it on your phone 📱
 
