@@ -1,8 +1,6 @@
 <div align="center">
 
-<img src="web/icon-192.png" width="96" alt="Kaiwa icon">
-
-# Kaiwa 会話
+<img src="docs/cover.jpg" alt="Kaiwa! 会話 — Your Private Japanese Conversation Tutor" width="100%">
 
 **Your private Japanese tutor — chat, voice calls, roleplay, corrections, and spaced repetition, running entirely on your own computer.**
 
