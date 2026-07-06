@@ -1,0 +1,19 @@
+# ---- user data: profile, API keys, chat history, backups — NEVER commit
+/data/
+
+# ---- large downloaded assets (fetched by setup.sh / the in-app wizard)
+/models/
+/vendor/
+
+# ---- python
+.venv/
+__pycache__/
+*.pyc
+
+# ---- personal notes & local tool state
+/ABOUT-KAIWA.txt
+/.claude/
+
+# ---- OS / misc
+.DS_Store
+*.log

@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#faf7f2">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Kaiwa">
+<title>Kaiwa 会話 — Japanese Tutor</title>
+<link rel="stylesheet" href="/static/style.css">
+<link rel="manifest" href="/static/manifest.json">
+<link rel="apple-touch-icon" href="/static/icon-180.png">
+<link rel="icon" type="image/png" href="/static/icon-192.png">
+</head>
+<body>
+<div id="app">
+  <nav id="sidebar">
+    <div class="logo"><svg class="icon logo-icon"><use href="/static/icons.svg#messages-square"/></svg> <span>Kaiwa</span><small>会話</small></div>
+    <button class="nav-btn active" data-view="home"><svg class="icon"><use href="/static/icons.svg#house"/></svg><em>Home</em></button>
+    <button class="nav-btn" data-view="review"><svg class="icon"><use href="/static/icons.svg#layers"/></svg><em>Review</em> <span id="due-badge" class="badge hidden"></span></button>
+    <button class="nav-btn" data-view="vocab"><svg class="icon"><use href="/static/icons.svg#book-open"/></svg><em>My Words</em></button>
+    <button class="nav-btn" data-view="dict"><svg class="icon"><use href="/static/icons.svg#languages"/></svg><em>Dictionary</em></button>
+    <button class="nav-btn" data-view="progress"><svg class="icon"><use href="/static/icons.svg#trending-up"/></svg><em>Progress</em></button>
+    <button class="nav-btn" data-view="settings"><svg class="icon"><use href="/static/icons.svg#settings"/></svg><em>Settings</em></button>
+    <div id="health" class="health"></div>
+  </nav>
+
+  <main id="main">
+    <!-- HOME -->
+    <section id="view-home" class="view">
+      <header class="home-head">
+        <div>
+          <h1 id="greeting">こんにちは！</h1>
+          <p id="home-sub" class="sub">Ready to practice some Japanese?</p>
+        </div>
+        <div class="chips" id="home-stats"></div>
+      </header>
+      <div id="srs-banner" class="srs-banner hidden"></div>
+
+      <div class="mode-cards">
+        <div class="mode-card free" id="card-free">
+          <svg class="icon mode-icon"><use href="/static/icons.svg#message-circle"/></svg>
+          <h3>Free Chat</h3><p>Talk about anything with your tutor, Kaiwa.</p>
+        </div>
+        <div class="mode-card call" id="card-call">
+          <svg class="icon mode-icon"><use href="/static/icons.svg#phone"/></svg>
+          <h3>Voice Call</h3><p>Hop on a call with Kaiwa — just talk, no typing.</p>
+        </div>
+        <div class="mode-card custom" id="card-custom">
+          <svg class="icon mode-icon"><use href="/static/icons.svg#drama"/></svg>
+          <h3>Custom Roleplay</h3><p>Invent your own scene — any role, any place.</p>
+        </div>
+      </div>
+
+      <h2 class="sect"><svg class="icon sect-icon"><use href="/static/icons.svg#book-marked"/></svg> Guided Lessons</h2>
+      <div id="lessons-row" class="scenario-row"></div>
+
+      <h2 class="sect"><svg class="icon sect-icon"><use href="/static/icons.svg#clapperboard"/></svg> Roleplay Scenarios</h2>
+      <div id="scenario-cats"></div>
+    </section>
+
+    <!-- CHAT -->
+    <section id="view-chat" class="view hidden">
+      <header class="chat-head">
+        <button id="chat-back" class="icon-btn" title="Back"><svg class="icon"><use href="/static/icons.svg#arrow-left"/></svg></button>
+        <div class="chat-title"><h2 id="chat-title">Free Chat</h2><small id="chat-sub"></small></div>
+        <div class="chat-tools">
+          <label class="mini-toggle"><input type="checkbox" id="tgl-furigana" checked><span>ふりがな</span></label>
+          <label class="mini-toggle"><input type="checkbox" id="tgl-romaji"><span>romaji</span></label>
+          <button id="end-session" class="btn danger small">End & Review</button>
+        </div>
+      </header>
+      <div id="messages"></div>
+      <div id="hints" class="hints hidden"></div>
+      <footer class="composer">
+        <button id="hint-btn" class="icon-btn big" title="Suggest replies"><svg class="icon"><use href="/static/icons.svg#lightbulb"/></svg></button>
+        <button id="mic-btn" class="icon-btn big mic" title="Click to speak"><svg class="icon"><use href="/static/icons.svg#mic"/></svg></button>
+        <input id="chat-input" type="text" placeholder="Type in Japanese (or English)…" autocomplete="off">
+        <button id="send-btn" class="icon-btn big send" title="Send"><svg class="icon"><use href="/static/icons.svg#send-horizontal"/></svg></button>
+      </footer>
+    </section>
+
+    <!-- REVIEW (SRS) -->
+    <section id="view-review" class="view hidden">
+      <h1><svg class="icon h1-icon"><use href="/static/icons.svg#layers"/></svg> Review</h1><p class="sub">Spaced repetition for the words you saved.</p>
+      <div id="review-area"></div>
+    </section>
+
+    <!-- VOCAB -->
+    <section id="view-vocab" class="view hidden">
+      <h1><svg class="icon h1-icon"><use href="/static/icons.svg#book-open"/></svg> My Words</h1><p class="sub">Every word you saved from conversations.</p>
+      <div id="vocab-list"></div>
+    </section>
+
+    <!-- DICTIONARY -->
+    <section id="view-dict" class="view hidden">
+      <h1><svg class="icon h1-icon"><use href="/static/icons.svg#languages"/></svg> Dictionary</h1>
+      <p class="sub">Search the built-in Japanese–English dictionary — works fully offline.</p>
+      <input id="dict-search" type="search" placeholder="Type Japanese (寿司, たべる) or English (sushi)…" autocomplete="off">
+      <div id="dict-results"></div>
+    </section>
+
+    <!-- PROGRESS -->
+    <section id="view-progress" class="view hidden">
+      <h1><svg class="icon h1-icon"><use href="/static/icons.svg#trending-up"/></svg> Progress</h1>
+      <div id="progress-stats" class="stat-grid"></div>
+      <h2 class="sect">Recent sessions</h2>
+      <div id="recent-sessions"></div>
+      <h2 class="sect">Mistake patterns</h2>
+      <div id="mistake-cats"></div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section id="view-settings" class="view hidden">
+      <h1><svg class="icon h1-icon"><use href="/static/icons.svg#settings"/></svg> Settings</h1>
+      <div class="settings-grid">
+        <div class="card">
+          <h3><svg class="icon"><use href="/static/icons.svg#user-round"/></svg> You</h3>
+          <label>Name <input id="set-name" type="text" placeholder="Your name"></label>
+          <label>Level
+            <div class="level-row" id="set-level">
+              <button data-l="N5">N5<br><small>Beginner</small></button>
+              <button data-l="N4">N4</button>
+              <button data-l="N3">N3</button>
+              <button data-l="N2">N2</button>
+              <button data-l="N1">N1<br><small>Advanced</small></button>
+            </div>
+          </label>
+          <label>Interests <input id="set-interests" type="text" placeholder="anime, cooking, travel…"></label>
+          <label>Goals <input id="set-goals" type="text" placeholder="trip to Japan in spring…"></label>
+        </div>
+        <div class="card">
+          <h3><svg class="icon"><use href="/static/icons.svg#sparkles"/></svg> AI</h3>
+          <label>AI Provider <select id="set-provider"></select></label>
+          <label id="apikey-row" class="hidden">API key <input id="set-apikey" type="password" autocomplete="off"></label>
+          <label>Model <select id="set-model"></select></label>
+          <label>Voice
+            <div class="voice-row">
+              <select id="set-voice"></select>
+              <button id="voice-preview" class="icon-btn" type="button" title="Hear this voice"><svg class="icon"><use href="/static/icons.svg#volume-2"/></svg></button>
+            </div>
+          </label>
+          <label>Speech speed <input id="set-speed" type="range" min="0.6" max="1.4" step="0.1"> <span id="speed-val"></span></label>
+          <label class="row"><input type="checkbox" id="set-autoplay"> Auto-play tutor voice</label>
+          <label class="row"><input type="checkbox" id="set-autotranslate"> Auto-translate tutor messages</label>
+          <button id="save-settings" class="btn primary">Save</button>
+          <p id="settings-saved" class="saved hidden">Saved ✓</p>
+        </div>
+        <div class="card">
+          <h3><svg class="icon"><use href="/static/icons.svg#shield-alert"/></svg> Your data</h3>
+          <p class="sub" style="margin-bottom:12px">Your streak, saved words, and history live in one local file. Don't lose them to a broken laptop.</p>
+          <label>Automatic backup
+            <select id="set-backup-freq">
+              <option value="off">Off</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+            </select>
+          </label>
+          <p id="backup-status" class="sub"></p>
+          <div class="data-btns">
+            <a class="btn" href="/api/backup/export" download>Export data</a>
+            <button class="btn" id="backup-now" type="button">Back up now</button>
+            <button class="btn" id="import-btn" type="button">Import…</button>
+            <input type="file" id="import-file" accept=".db" class="hidden">
+          </div>
+        </div>
+        <div class="card">
+          <h3><svg class="icon"><use href="/static/icons.svg#smartphone"/></svg> On your phone</h3>
+          <div id="phone-setup"><p class="sub">Checking…</p></div>
+        </div>
+        <div class="card">
+          <h3><svg class="icon"><use href="/static/icons.svg#heart"/></svg> Community</h3>
+          <p class="sub" style="margin-bottom:12px">Follow Kaiwa for updates, tips, and new scenarios.</p>
+          <!-- TODO: replace placeholder URLs before release -->
+          <div class="link-list">
+            <a class="ext-link" href="https://facebook.com/kaiwa-app" target="_blank" rel="noopener"><svg class="icon"><use href="/static/icons.svg#users"/></svg> Facebook page</a>
+            <a class="ext-link" href="https://kaiwa.app" target="_blank" rel="noopener"><svg class="icon"><use href="/static/icons.svg#link"/></svg> Website</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- Voice call overlay -->
+<div id="call-overlay" class="call-overlay hidden">
+  <div class="call-head">
+    <span class="call-name">カイワ Kaiwa</span>
+    <span id="call-timer">0:00</span>
+  </div>
+  <div class="call-stage">
+    <div id="call-avatar" class="call-avatar" title="Tap to interrupt">
+      <span class="call-face">カイワ</span>
+      <span class="ring r1"></span><span class="ring r2"></span>
+    </div>
+    <div id="call-status" class="call-status">Calling…</div>
+    <div id="call-caption" class="call-caption"></div>
+  </div>
+  <div class="call-controls">
+    <button id="call-mute" class="call-btn" title="Mute"><svg class="icon"><use href="/static/icons.svg#mic"/></svg></button>
+    <button id="call-hangup" class="call-btn hangup" title="Hang up"><svg class="icon"><use href="/static/icons.svg#phone-off"/></svg></button>
+    <button id="call-cc" class="call-btn active" title="Captions"><svg class="icon"><use href="/static/icons.svg#captions"/></svg></button>
+  </div>
+</div>
+
+<!-- Word popup -->
+<div id="word-pop" class="popup hidden"><div class="popup-inner" id="word-pop-inner"></div></div>
+<!-- Custom roleplay modal -->
+<div id="custom-modal" class="modal hidden">
+  <div class="modal-inner">
+    <h2><svg class="icon"><use href="/static/icons.svg#drama"/></svg> Custom Roleplay</h2>
+    <label>Scene title <input id="cr-title" placeholder="Buying a katana in Kyoto"></label>
+    <label>The AI plays… <input id="cr-ai" placeholder="a grumpy sword shop owner"></label>
+    <label>You play… <input id="cr-user" placeholder="a tourist who knows nothing about swords"></label>
+    <label>Setting <input id="cr-setting" placeholder="an old sword shop in a Kyoto alley"></label>
+    <label>Goal <input id="cr-desc" placeholder="negotiate a price and learn sword words"></label>
+    <div class="modal-btns"><button class="btn" id="cr-cancel">Cancel</button><button class="btn primary" id="cr-start">Start scene ➤</button></div>
+  </div>
+</div>
+<!-- Summary modal -->
+<div id="summary-modal" class="modal hidden"><div class="modal-inner" id="summary-inner"></div></div>
+<!-- Onboarding modal -->
+<div id="onboard-modal" class="modal hidden">
+  <div class="modal-inner">
+    <h2>ようこそ！ Welcome to Kaiwa <svg class="icon accent"><use href="/static/icons.svg#flower-2"/></svg></h2>
+
+    <!-- STEP 0: AI setup (skipped when an AI is already working) -->
+    <div id="ob-step-ai" class="hidden">
+      <p class="sub">Kaiwa needs an AI brain. Pick how you want to run it — you can change this later in Settings.</p>
+      <div id="ob-ai-choice">
+        <div class="setup-opt" id="ob-opt-local">
+          <svg class="icon"><use href="/static/icons.svg#house"/></svg>
+          <div><b>On this computer</b><br><small>Free &amp; 100% private. Downloads a model once (1–5 GB), replies depend on your hardware.</small></div>
+        </div>
+        <div class="setup-opt" id="ob-opt-cloud">
+          <svg class="icon"><use href="/static/icons.svg#sparkles"/></svg>
+          <div><b>Cloud AI</b><br><small>Faster &amp; smarter. Needs an API key (Google Gemini has a free tier).</small></div>
+        </div>
+      </div>
+
+      <div id="ob-local" class="hidden">
+        <div id="ob-ollama-missing" class="hidden">
+          <p>Local AI runs on <b>Ollama</b>, a free app.</p>
+          <p><a class="btn primary" href="https://ollama.com/download" target="_blank" rel="noopener">Download Ollama ↗</a></p>
+          <p class="sub"><svg class="icon spin"><use href="/static/icons.svg#loader"/></svg> Install and open it — I'll notice automatically…</p>
+        </div>
+        <div id="ob-model-dl" class="hidden">
+          <p id="ob-hw-note" class="sub"></p>
+          <button id="ob-pull-btn" class="btn primary">Download model</button>
+          <div id="ob-pull-progress" class="hidden">
+            <div class="progress"><div id="ob-pull-fill" class="progress-fill"></div></div>
+            <p id="ob-pull-status" class="sub"></p>
+          </div>
+        </div>
+      </div>
+
+      <div id="ob-cloud" class="hidden">
+        <label>Provider <select id="ob-provider"></select></label>
+        <p id="ob-key-hint" class="sub"></p>
+        <label>API key <input id="ob-apikey" type="password" autocomplete="off" placeholder="Paste your API key"></label>
+        <div class="modal-btns"><button class="btn primary" id="ob-cloud-save">Continue ➤</button></div>
+      </div>
+
+      <p id="ob-ai-back-row" class="hidden"><button class="btn" id="ob-ai-back">← Back</button></p>
+    </div>
+
+    <!-- STEP 1: profile -->
+    <div id="ob-step-profile" class="hidden">
+      <p class="sub">Two quick questions so your tutor knows you:</p>
+      <label>What should Kaiwa call you? <input id="ob-name" placeholder="Your name"></label>
+      <label>Your Japanese level
+        <div class="level-row" id="ob-level">
+          <button data-l="N5" class="active">N5<br><small>Beginner</small></button>
+          <button data-l="N4">N4</button>
+          <button data-l="N3">N3</button>
+          <button data-l="N2">N2</button>
+          <button data-l="N1">N1<br><small>Advanced</small></button>
+        </div>
+      </label>
+      <label>Interests (helps Kaiwa pick topics) <input id="ob-interests" placeholder="anime, cooking, football…"></label>
+      <div class="modal-btns"><button class="btn primary" id="ob-start">はじめましょう！ Let's go ➤</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- print-only session report (filled by printSessionReport) -->
+<div id="print-report"></div>
+
+<script src="/static/qrcode.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>
