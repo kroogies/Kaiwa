@@ -17,26 +17,67 @@
   --green: #3aa675; --green-soft: #e7f6ef;
   --amber: #e8a13d; --amber-soft: #fdf3e3;
   --border: #ece7df; --shadow: 0 2px 12px rgba(45,42,50,.07); --radius: 18px;
+  --nav-h: 62px;
 }
 * { box-sizing: border-box; margin: 0; }
+html { scroll-behavior: smooth; }
 body {
   font-family: -apple-system, "Segoe UI", "Hiragino Sans", "Yu Gothic", sans-serif;
   background: var(--bg); color: var(--ink); -webkit-font-smoothing: antialiased;
-  line-height: 1.6;
+  line-height: 1.65;
 }
 a { color: var(--accent); }
-.wrap { max-width: 960px; margin: 0 auto; padding: 0 24px; }
+.wrap { max-width: 980px; margin: 0 auto; padding: 0 24px; }
+section { padding: 76px 0 0; }
+section > .wrap > h2, header h1 { letter-spacing: -.02em; }
+[id] { scroll-margin-top: calc(var(--nav-h) + 16px); }
 
-/* hero */
-header { text-align: center; padding: 72px 0 48px; }
-header img { width: 104px; border-radius: 24px; box-shadow: var(--shadow); }
-h1 { font-size: 3rem; margin: 18px 0 4px; letter-spacing: -.02em; }
+/* ------------------------------------------------------------- navbar */
+nav {
+  position: sticky; top: 0; z-index: 50; height: var(--nav-h);
+  background: rgba(250,247,242,.85); backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--border);
+}
+.nav-inner { display: flex; align-items: center; gap: 18px; height: var(--nav-h); }
+.brand {
+  display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 1.05rem;
+  color: var(--ink); text-decoration: none; margin-right: auto;
+}
+.brand img { width: 30px; border-radius: 8px; }
+.brand .jp { color: var(--accent); }
+.nav-links { display: flex; align-items: center; gap: 22px; }
+.nav-links a { color: var(--ink); text-decoration: none; font-size: .92rem; font-weight: 600; }
+.nav-links a:hover { color: var(--accent); }
+.nav-links .nav-dl {
+  background: var(--accent); color: #fff; padding: 8px 18px; border-radius: 10px;
+  box-shadow: 0 3px 10px rgba(232,93,117,.3);
+}
+.nav-links .nav-dl:hover { color: #fff; filter: brightness(1.05); }
+#burger {
+  display: none; background: none; border: none; font-size: 1.5rem; color: var(--ink);
+  cursor: pointer; padding: 4px 8px;
+}
+@media (max-width: 760px) {
+  #burger { display: block; }
+  .nav-links {
+    display: none; position: absolute; top: var(--nav-h); left: 0; right: 0;
+    flex-direction: column; align-items: stretch; gap: 0;
+    background: var(--bg); border-bottom: 1px solid var(--border);
+    box-shadow: 0 12px 24px rgba(45,42,50,.08);
+  }
+  .nav-links.open { display: flex; }
+  .nav-links a { padding: 14px 24px; border-top: 1px solid var(--border); }
+  .nav-links .nav-dl { margin: 12px 24px 16px; text-align: center; border-radius: 12px; }
+}
+
+/* --------------------------------------------------------------- hero */
+header { text-align: center; padding: 64px 0 0; }
+header img.mark { width: 104px; border-radius: 24px; box-shadow: var(--shadow); }
+h1 { font-size: 3rem; margin: 20px 0 6px; }
 h1 .jp { color: var(--accent); font-weight: 700; }
-.tagline { font-size: 1.25rem; color: var(--sub); max-width: 560px; margin: 0 auto 8px; }
-.pitch { max-width: 620px; margin: 10px auto 0; color: var(--ink); }
-
-/* download buttons */
-.dl-row { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; margin: 34px 0 10px; }
+.tagline { font-size: 1.25rem; color: var(--sub); max-width: 560px; margin: 0 auto; }
+.pitch { max-width: 620px; margin: 14px auto 0; }
+.dl-row { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; margin: 36px 0 0; }
 .dl {
   display: inline-flex; flex-direction: column; align-items: center; gap: 2px;
   padding: 14px 34px; border-radius: 14px; text-decoration: none; font-weight: 700;
@@ -46,55 +87,102 @@ h1 .jp { color: var(--accent); font-weight: 700; }
 .dl:hover { transform: translateY(-2px); }
 .dl.primary { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 6px 18px rgba(232,93,117,.35); }
 .dl small { font-weight: 500; font-size: .78rem; opacity: .75; }
-.gh-link { font-size: .9rem; color: var(--sub); }
-.free-note { margin-top: 14px; font-size: .85rem; color: var(--sub); }
+.hero-notes { margin-top: 18px; font-size: .88rem; color: var(--sub); }
+.hero-notes a { color: var(--sub); }
 
-/* privacy strip */
-.strip { background: var(--indigo-soft); padding: 40px 0; margin-top: 46px; }
+/* ------------------------------------------------------- privacy strip */
+.strip { background: var(--indigo-soft); padding: 44px 0; margin-top: 56px; }
 .strip .wrap { display: flex; gap: 28px; flex-wrap: wrap; justify-content: center; text-align: center; }
-.strip .fact { flex: 1 1 200px; max-width: 280px; }
+.strip .fact { flex: 1 1 220px; max-width: 290px; }
 .strip .fact b { display: block; font-size: 1.05rem; margin-bottom: 4px; color: var(--indigo); }
-.strip .fact span { font-size: .9rem; color: var(--ink); }
+.strip .fact span { font-size: .9rem; }
 
-/* features */
-section { padding: 56px 0 8px; }
-h2 { text-align: center; font-size: 1.8rem; margin-bottom: 8px; }
-.sub-h { text-align: center; color: var(--sub); margin-bottom: 34px; }
-.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+/* ------------------------------------------------------------ sections */
+h2 { text-align: center; font-size: 1.9rem; }
+.sub-h { text-align: center; color: var(--sub); margin: 6px auto 40px; max-width: 560px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; }
 .card {
   background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
-  padding: 22px; box-shadow: var(--shadow);
+  padding: 24px; box-shadow: var(--shadow);
 }
 .card .emoji { font-size: 1.6rem; }
-.card b { display: block; margin: 6px 0 4px; }
+.card b { display: block; margin: 8px 0 4px; }
 .card p { font-size: .92rem; color: var(--sub); }
 
-/* install steps */
-.steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-top: 8px; }
-.step { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px; box-shadow: var(--shadow); }
+/* steps */
+.steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; }
+.step { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow); }
 .step .n {
-  display: inline-flex; width: 30px; height: 30px; border-radius: 50%; background: var(--accent-soft);
-  color: var(--accent); font-weight: 800; align-items: center; justify-content: center; margin-bottom: 10px;
+  display: inline-flex; width: 32px; height: 32px; border-radius: 50%; background: var(--accent-soft);
+  color: var(--accent); font-weight: 800; align-items: center; justify-content: center; margin-bottom: 12px;
 }
 .step code, .step pre { background: var(--bg); border-radius: 8px; font-size: .84rem; }
-.step pre { padding: 10px 12px; overflow-x: auto; margin-top: 8px; }
+.step pre { padding: 10px 12px; overflow-x: auto; margin-top: 10px; }
 .step code { padding: 1px 6px; }
-.step p { font-size: .92rem; }
+.step p { font-size: .93rem; }
 
-/* footer */
-footer { margin-top: 64px; padding: 34px 0 44px; border-top: 1px solid var(--border); text-align: center; color: var(--sub); font-size: .88rem; }
-footer .jp-deco { font-size: 1.4rem; color: var(--accent); opacity: .5; display: block; margin-bottom: 10px; }
+/* ----------------------------------------------------------------- faq */
+.faq { max-width: 720px; margin: 0 auto; }
+.faq details {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
+  box-shadow: var(--shadow); margin-bottom: 12px; overflow: hidden;
+}
+.faq summary {
+  cursor: pointer; list-style: none; font-weight: 700; padding: 16px 20px;
+  display: flex; align-items: center; gap: 12px;
+}
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::before { content: "＋"; color: var(--accent); font-weight: 800; flex-shrink: 0; }
+.faq details[open] summary::before { content: "－"; }
+.faq details div { padding: 0 20px 18px 46px; font-size: .93rem; color: var(--sub); }
+.faq details div b { color: var(--ink); }
+
+/* --------------------------------------------------------------- about */
+.about-box {
+  display: flex; gap: 32px; align-items: center; flex-wrap: wrap;
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 32px; max-width: 860px; margin: 0 auto;
+}
+.about-box img { width: 100%; max-width: 340px; border-radius: 14px; flex: 1 1 280px; }
+.about-box .txt { flex: 1 1 320px; font-size: .96rem; }
+.about-box .txt p + p { margin-top: 12px; }
+
+/* ------------------------------------------------------------- contact */
+.contact-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; max-width: 860px; margin: 0 auto; }
+.contact-grid a.card { display: block; text-decoration: none; color: var(--ink); text-align: center; transition: transform .12s ease; }
+.contact-grid a.card:hover { transform: translateY(-2px); }
+.contact-grid .card b { color: var(--accent); }
+
+/* -------------------------------------------------------------- footer */
+footer { margin-top: 88px; padding: 36px 0 46px; border-top: 1px solid var(--border); text-align: center; color: var(--sub); font-size: .88rem; }
+footer .jp-deco { font-size: 1.4rem; color: var(--accent); opacity: .55; display: block; margin-bottom: 10px; }
 
 @media (max-width: 600px) {
   h1 { font-size: 2.2rem; }
-  header { padding: 48px 0 32px; }
+  header { padding: 44px 0 0; }
+  section { padding: 60px 0 0; }
 }
 </style>
 </head>
 <body>
 
-<header class="wrap">
-  <img src="icon-192.png" alt="Kaiwa icon">
+<nav>
+  <div class="wrap nav-inner">
+    <a class="brand" href="#top"><img src="icon-192.png" alt="">Kaiwa <span class="jp">会話</span></a>
+    <button id="burger" aria-label="Menu">☰</button>
+    <div class="nav-links" id="nav-links">
+      <a href="#features">Features</a>
+      <a href="#install">Get started</a>
+      <a href="#faq">FAQ</a>
+      <a href="#about">About</a>
+      <a href="#contact">Contact</a>
+      <a class="nav-dl" id="nav-dl" href="https://github.com/kroogies/Kaiwa/releases/latest">Download</a>
+    </div>
+  </div>
+</nav>
+
+<header id="top" class="wrap">
+  <img class="mark" src="icon-192.png" alt="Kaiwa icon">
   <h1>Kaiwa <span class="jp">会話</span></h1>
   <p class="tagline">Your private Japanese tutor — on your computer, not in the cloud.</p>
   <p class="pitch">Chat, hop on voice calls, roleplay everyday scenarios, get corrected,
@@ -106,8 +194,10 @@ footer .jp-deco { font-size: 1.4rem; color: var(--accent); opacity: .5; display:
     <a class="dl" id="dl-win" href="https://github.com/kroogies/Kaiwa/releases/latest/download/kaiwa-windows-beta.zip">
       🪟 Download for Windows <small>beta · free</small></a>
   </div>
-  <p class="gh-link"><a href="https://github.com/kroogies/Kaiwa">View source on GitHub</a> · AGPL-3.0</p>
-  <p class="free-note">No account. No subscription. No telemetry.</p>
+  <p class="hero-notes">
+    <a href="https://github.com/kroogies/Kaiwa">View source on GitHub</a> · AGPL-3.0<br>
+    No account. No subscription. No telemetry.
+  </p>
 </header>
 
 <div class="strip">
@@ -118,31 +208,135 @@ footer .jp-deco { font-size: 1.4rem; color: var(--accent); opacity: .5; display:
   </div>
 </div>
 
-<section class="wrap">
-  <h2>Everything a tutor does</h2>
-  <p class="sub-h">Built for real conversation practice at your JLPT level, N5 → N1</p>
-  <div class="grid">
-    <div class="card"><span class="emoji">💬</span><b>Free chat &amp; voice calls</b><p>Type or just talk — real-time spoken conversation with automatic turn-taking.</p></div>
-    <div class="card"><span class="emoji">🎬</span><b>36 roleplay scenarios</b><p>Order ramen, survive a job interview, check into a ryokan, report a lost wallet at the kōban…</p></div>
-    <div class="card"><span class="emoji">✏️</span><b>Corrections that teach</b><p>Every message checked, mistakes explained in English and remembered. Use an advanced kanji correctly? You get praised, not corrected.</p></div>
-    <div class="card"><span class="emoji">📚</span><b>Offline dictionary</b><p>JMdict, 490k+ entries. Tap any word in any chat for furigana, meaning, and an example.</p></div>
-    <div class="card"><span class="emoji">🃏</span><b>Spaced repetition</b><p>Anki-style reviews of words you save — each grade button shows exactly when the word comes back.</p></div>
-    <div class="card"><span class="emoji">📱</span><b>Works on your phone</b><p>Your computer does the AI work; your phone is the screen. Free secure link via Tailscale, installs like an app.</p></div>
+<section id="features">
+  <div class="wrap">
+    <h2>Everything a tutor does</h2>
+    <p class="sub-h">Built for real conversation practice at your JLPT level, N5 → N1</p>
+    <div class="grid">
+      <div class="card"><span class="emoji">💬</span><b>Free chat &amp; voice calls</b><p>Type or just talk — real-time spoken conversation with automatic turn-taking.</p></div>
+      <div class="card"><span class="emoji">🎬</span><b>36 roleplay scenarios</b><p>Order ramen, survive a job interview, check into a ryokan, report a lost wallet at the kōban…</p></div>
+      <div class="card"><span class="emoji">✏️</span><b>Corrections that teach</b><p>Every message checked, mistakes explained in English and remembered. Use an advanced kanji correctly? You get praised, not corrected.</p></div>
+      <div class="card"><span class="emoji">📚</span><b>Offline dictionary</b><p>JMdict, 490k+ entries. Tap any word in any chat for furigana, meaning, and an example.</p></div>
+      <div class="card"><span class="emoji">🃏</span><b>Spaced repetition</b><p>Anki-style reviews of words you save — each grade button shows exactly when the word comes back.</p></div>
+      <div class="card"><span class="emoji">📱</span><b>Works on your phone</b><p>Your computer does the AI work; your phone is the screen. Free secure link via Tailscale, installs like an app.</p></div>
+    </div>
   </div>
 </section>
 
-<section class="wrap">
-  <h2>Running in 3 steps</h2>
-  <p class="sub-h">One-time setup, ~10 minutes. The wizard picks an AI model that fits your hardware.</p>
-  <div class="steps">
-    <div class="step"><span class="n">1</span>
-      <p>Install <a href="https://ollama.com">Ollama</a> — the free local AI engine Kaiwa uses by default.</p></div>
-    <div class="step"><span class="n">2</span>
-      <p>Download Kaiwa above, unzip, and run:</p>
-      <pre>macOS:    ./setup.sh  then  ./run.sh
+<section id="install">
+  <div class="wrap">
+    <h2>Running in 3 steps</h2>
+    <p class="sub-h">One-time setup, ~10 minutes. The wizard picks an AI model that fits your hardware.</p>
+    <div class="steps">
+      <div class="step"><span class="n">1</span>
+        <p>Install <a href="https://ollama.com">Ollama</a> — the free local AI engine Kaiwa uses by default.</p></div>
+      <div class="step"><span class="n">2</span>
+        <p>Download Kaiwa above, unzip, and run:</p>
+        <pre>macOS:    ./setup.sh  then  ./run.sh
 Windows:  .\setup.ps1  then  .\run.ps1</pre></div>
-    <div class="step"><span class="n">3</span>
-      <p>Open <code>http://localhost:8130</code> — the onboarding wizard takes it from there. こんにちは！</p></div>
+      <div class="step"><span class="n">3</span>
+        <p>Open <code>http://localhost:8130</code> — the onboarding wizard takes it from there. こんにちは！</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap">
+    <h2>Questions, answered</h2>
+    <p class="sub-h">The things everyone asks before trying it</p>
+    <div class="faq">
+      <details>
+        <summary>Is it really free?</summary>
+        <div>Yes. Kaiwa is open source under AGPL-3.0 — no account, no subscription,
+        no trial, no telemetry. If you <b>choose</b> to connect a cloud AI
+        (Gemini/OpenAI/Claude), you use your own API key and pay that provider
+        directly — Gemini has a free tier. The default local AI costs nothing.</div>
+      </details>
+      <details>
+        <summary>Do I need to be technical to install it?</summary>
+        <div>A little, for now: download the zip, unzip it, and run two scripts —
+        the setup wizard handles all the AI setup after that. One-click
+        installers (.dmg / .exe) that start everything automatically are on the
+        <a href="#roadmap-note">roadmap</a>.</div>
+      </details>
+      <details>
+        <summary>What kind of computer do I need?</summary>
+        <div>Realistically ~8&nbsp;GB of RAM. <b>No GPU needed</b> — a CPU-only machine
+        runs a small model at conversational (not instant) speed. The first-run
+        wizard checks your hardware and recommends a model that will actually feel
+        good on it. Kaiwa is developed on an aging Intel MacBook — if it runs
+        there, it runs on your machine.</div>
+      </details>
+      <details>
+        <summary>Does it work offline?</summary>
+        <div>Yes. After the one-time setup downloads (AI model, dictionary, speech
+        model), everything — chat, voice, corrections, dictionary, reviews — works
+        with the Wi-Fi off.</div>
+      </details>
+      <details>
+        <summary>Where does my data go?</summary>
+        <div>Nowhere. Everything lives in one SQLite file on your disk
+        (<code>data/kaiwa.db</code>). You can export it, back it up automatically,
+        move it between Mac and Windows, or delete it. Messages only leave your
+        machine if you deliberately connect a cloud AI with your own key.</div>
+      </details>
+      <details>
+        <summary>I'm a total beginner — is it for me?</summary>
+        <div>Yes — pick N5 and Kaiwa speaks simply, praises what you get right,
+        explains mistakes in English, and gives you three suggested replies
+        whenever you're stuck. Furigana, romaji, and translations can be toggled
+        per conversation, and 10 guided lessons walk you from greetings to keigo.</div>
+      </details>
+      <details>
+        <summary>How do I get the really nice voices?</summary>
+        <div>Out of the box Kaiwa uses your OS's built-in Japanese voice. For much
+        nicer ones, download the free
+        <a href="https://github.com/VOICEVOX/voicevox_engine/releases">VOICEVOX engine</a>
+        and unzip it into Kaiwa's <code>vendor/</code> folder — it's picked up
+        automatically and a voice picker (with previews) appears in Settings.</div>
+      </details>
+      <details>
+        <summary>Can I use it on my phone?</summary>
+        <div>Yes. Your computer runs Kaiwa; your phone connects to it securely from
+        anywhere with the free <a href="https://tailscale.com">Tailscale</a> app —
+        Settings shows a QR code to scan, then "Add to Home Screen" makes it feel
+        like a native app, mic and all.</div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<section id="about">
+  <div class="wrap">
+    <h2>About Kaiwa</h2>
+    <p class="sub-h">Why this exists</p>
+    <div class="about-box">
+      <img src="cover.jpg" alt="Kaiwa sakura cover art">
+      <div class="txt">
+        <p>Kaiwa is built by <a href="https://github.com/kroogies">@kroogies</a> —
+        a Japanese learner who wanted real conversation practice without a
+        subscription, and without sending every clumsy sentence to someone
+        else's server.</p>
+        <p>It started as a personal tool on an old Intel MacBook and grew into a
+        full tutor: conversations, corrections, a dictionary, reviews — all
+        running locally, because language practice is personal.</p>
+        <p id="roadmap-note">It's open source under AGPL-3.0, which keeps it free
+        forever — for everyone, from anyone. Next up: real one-click installers,
+        nicer onboarding, and a stable Windows release.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="contact">
+  <div class="wrap">
+    <h2>Say hello</h2>
+    <p class="sub-h">No forms, no support tickets — it all happens in the open, on GitHub</p>
+    <div class="contact-grid">
+      <a class="card" href="https://github.com/kroogies/Kaiwa/issues/new"><span class="emoji">🐞</span><b>Found a bug?</b><p>Open an issue — beta testers (especially on Windows) are heroes.</p></a>
+      <a class="card" href="https://github.com/kroogies/Kaiwa/discussions"><span class="emoji">💬</span><b>Questions &amp; ideas</b><p>Ask anything, share feedback, or show off your streak in Discussions.</p></a>
+      <a class="card" href="https://github.com/kroogies/Kaiwa"><span class="emoji">⭐</span><b>Follow along</b><p>Star or watch the repo to catch new releases and features.</p></a>
+    </div>
   </div>
 </section>
 
@@ -159,13 +353,20 @@ Windows:  .\setup.ps1  then  .\run.ps1</pre></div>
 </footer>
 
 <script>
-// put the visitor's own OS first and make it the highlighted button
+// highlight the visitor's own OS and point the navbar Download at it
 (function () {
   const mac = document.getElementById("dl-mac");
   const win = document.getElementById("dl-win");
   const isMac = /Mac/.test(navigator.platform);
-  (isMac ? mac : win).classList.add("primary");
+  const mine = isMac ? mac : win;
+  mine.classList.add("primary");
   if (!isMac) win.parentNode.insertBefore(win, mac);
+  document.getElementById("nav-dl").href = mine.href;
+
+  // mobile menu
+  const links = document.getElementById("nav-links");
+  document.getElementById("burger").addEventListener("click", () => links.classList.toggle("open"));
+  links.addEventListener("click", e => { if (e.target.tagName === "A") links.classList.remove("open"); });
 })();
 </script>
 </body>
