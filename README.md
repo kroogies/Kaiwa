@@ -1,13 +1,45 @@
-# Kaiwa 会話 — your private Japanese tutor
+<div align="center">
 
-A Japanese conversation tutor that runs **on your own computer**. Chat, hop on
-voice calls, roleplay everyday scenarios, get corrected, save words, and review
-them with spaced repetition — free, private, and offline-first.
+<img src="web/icon-192.png" width="96" alt="Kaiwa icon">
 
-No subscriptions. Your conversations never leave your machine (unless *you*
-plug in a cloud AI key — see below).
+# Kaiwa 会話
 
-> **Platforms:** macOS today. Windows support is planned — watch the issues.
+**Your private Japanese tutor — chat, voice calls, roleplay, corrections, and spaced repetition, running entirely on your own computer.**
+
+[![Release](https://img.shields.io/github/v/release/kroogies/Kaiwa)](https://github.com/kroogies/Kaiwa/releases/latest)
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
+![Platforms](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20(beta)-lightgrey)
+![Local first](https://img.shields.io/badge/AI-100%25%20local%20by%20default-success)
+
+</div>
+
+No subscriptions. No account. Your conversations never leave your machine
+(unless *you* plug in a cloud AI key — see [Choose your AI](#choose-your-ai)).
+
+## Get it
+
+Grab the zip for your OS from the **[latest release](https://github.com/kroogies/Kaiwa/releases/latest)**, unzip, and run:
+
+**macOS**
+```bash
+./setup.sh    # venv + dependencies + speech model + dictionary (~600 MB)
+./run.sh      # starts everything → http://localhost:8130
+```
+Voice input additionally needs whisper.cpp: `brew install whisper-cpp`
+
+**Windows (beta)** — in PowerShell:
+```powershell
+.\setup.ps1
+.\run.ps1     # → http://localhost:8130
+```
+
+Both need [Ollama](https://ollama.com) installed (the free local AI that powers
+Kaiwa by default). First launch opens an onboarding wizard that checks your
+hardware, recommends a model that will actually be responsive on it, and takes
+~30s to warm up.
+
+> Developing or contributing? `git clone` this repo instead — `main` is the
+> stable release, `dev` is where work happens.
 
 ## What it does
 
@@ -18,15 +50,15 @@ plug in a cloud AI key — see below).
 | 🎬 **36 roleplay scenarios** | Ramen shop, job interview, izakaya, kōban, ryokan… |
 | 🎭 **Custom roleplay** | Define any scene, any roles |
 | 📖 **10 guided lessons** | Structured mini-lessons (greetings → keigo) |
-| ✏️ **Live corrections** | Every message checked; mistakes explained in English & remembered |
+| ✏️ **Live corrections** | Every message checked; mistakes explained in English & remembered — and correctly-used advanced kanji gets praised, not "corrected" |
 | 💡 **Hints** | Stuck? Get 3 suggested replies at your level |
 | ふ **Furigana / romaji / translation** | Toggle per conversation, tap any word for its meaning |
 | 📚 **Dictionary** | JMdict (490k+ entries) — tap words in chat, or search Japanese/English in the Dictionary tab. Fully offline |
-| 🃏 **SRS review** | Anki-style spaced repetition for words you save |
+| 🃏 **SRS review** | Anki-style spaced repetition — grade buttons show exactly when each word comes back |
 | 📝 **Session reports** | Summary, strengths, focus areas — expandable in Progress, savable as PDF |
 | 📈 **Progress** | Streaks, minutes practiced, mistake patterns |
 | 🧠 **Memory** | Your recent mistakes & words feed back into the tutor's brain |
-| 💾 **Backups** | Automatic daily/weekly backups + one-click export/import to move machines |
+| 💾 **Backups** | Automatic daily/weekly backups + one-click export/import — moves cleanly between macOS and Windows |
 
 ## Choose your AI
 
@@ -45,29 +77,13 @@ Kaiwa works with either:
 Speech recognition, speech synthesis, the dictionary, and all your data stay
 local either way.
 
-## Install (macOS)
-
-```bash
-git clone <this repo>
-cd kaiwa
-./setup.sh    # venv + dependencies + speech model + dictionary (~600 MB)
-./run.sh      # starts everything → http://localhost:8130
-```
-
-First launch opens an onboarding wizard that sets up your AI (local or cloud)
-and takes ~30s to warm up. Voice input additionally needs whisper.cpp:
-
-```bash
-brew install whisper-cpp
-```
-
 ### Better voices (optional)
 
-Out of the box Kaiwa speaks with macOS's built-in Kyoko voice. For much nicer
-Japanese voices, download the [VOICEVOX engine](https://github.com/VOICEVOX/voicevox_engine/releases)
-(macOS x64 CPU build) and unzip it to `vendor/macos-x64/` so that
-`vendor/macos-x64/run` exists. `run.sh` will pick it up automatically, and a
-voice picker (with preview) appears in Settings.
+Out of the box Kaiwa speaks with your OS's built-in Japanese voice. For much
+nicer voices, download the [VOICEVOX engine](https://github.com/VOICEVOX/voicevox_engine/releases)
+(CPU build for your OS) and unzip it into `vendor/` (e.g. `vendor/macos-x64/`
+so that `vendor/macos-x64/run` exists). `run.sh` picks it up automatically, and
+a voice picker (with preview) appears in Settings.
 
 ## Use it on your phone 📱
 
@@ -85,11 +101,10 @@ Tailscale provides the HTTPS link that makes voice work.
 ## Your data
 
 Everything lives in one file: `data/kaiwa.db`. In **Settings → Your data** you
-can export it, import it on a new machine, and turn on automatic daily/weekly
-backups (kept in `~/Documents/Kaiwa Backups`, last 8 rotated). Tip: point your
-backups at a folder inside iCloud Drive/Dropbox and they sync off-machine too.
-
-Reset everything: delete `data/kaiwa.db`.
+can export it, import it on a new machine (macOS ↔ Windows both ways), turn on
+automatic daily/weekly backups (kept in `~/Documents/Kaiwa Backups`, last 8
+rotated), or reset everything for a fresh start. Tip: point your backups at a
+folder inside iCloud Drive/Dropbox and they sync off-machine too.
 
 ## Configuration
 
@@ -102,9 +117,14 @@ Logs land in `/tmp/ollama.log` and `/tmp/voicevox.log`.
 
 ## The stack
 
-FastAPI + SQLite + vanilla JS (no build step). STT: whisper.cpp. TTS: VOICEVOX
-or macOS `say`. Tokenizer/furigana: fugashi (UniDic). LLM: Ollama or
-Gemini/OpenAI/Anthropic over plain HTTP.
+FastAPI + SQLite + vanilla JS (no build step). STT: whisper.cpp. TTS: VOICEVOX,
+macOS `say`, or Windows SAPI. Tokenizer/furigana: fugashi (UniDic). LLM: Ollama
+or Gemini/OpenAI/Anthropic over plain HTTP.
+
+## Contributing
+
+Issues and PRs welcome — branch off `dev`. If Kaiwa helps your Japanese, a ⭐
+helps other learners find it.
 
 ## Credits & data licenses
 
