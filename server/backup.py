@@ -77,6 +77,7 @@ def restore_from(data: bytes) -> str | None:
             return "That database is missing Kaiwa's tables — is it really a Kaiwa backup?"
         snapshot_to(db.DB_PATH + ".pre-restore")  # safety copy of what's being replaced
         shutil.move(tmp, db.DB_PATH)
+        _sanitize_cross_platform()
         return None
     except Exception as e:  # noqa: BLE001 — surfaced to the user
         return f"Restore failed: {e}"
@@ -86,6 +87,38 @@ def restore_from(data: bytes) -> str | None:
                 os.remove(tmp)
             except OSError:
                 pass
+
+
+def _sanitize_cross_platform():
+    """A backup made on another OS can carry settings that don't work here:
+    a TTS voice for an engine this platform doesn't have (macOS `say:` voices
+    on Windows) or an absolute backup path from the other filesystem. Reset
+    those to defaults rather than let them fail quietly later.
+
+    Deliberately does NOT touch `vv:` voices — VOICEVOX runs on every
+    platform and may simply be down at restore time.
+    """
+    fixes = {}
+    voice = db.get_setting("voice") or ""
+    if voice and not (voice.startswith("vv:")
+                      or (voice.startswith("say:") and shutil.which("say"))):
+        fixes["voice"] = ""  # falls back to tts.default_voice()
+    d = db.get_setting("backup_dir") or ""
+    if d and not os.path.isdir(d) and not os.path.isdir(os.path.dirname(d)):
+        fixes["backup_dir"] = ""  # foreign path — falls back to DEFAULT_DIR
+    if fixes:
+        db.set_settings(fixes)
+
+
+def reset_all():
+    """Wipe all user data back to a fresh install (for debugging / starting over).
+
+    Keeps a safety snapshot next to the db, same as restore does, so a
+    mis-click is recoverable by renaming kaiwa.db.pre-reset back.
+    """
+    snapshot_to(db.DB_PATH + ".pre-reset")
+    os.remove(db.DB_PATH)
+    db.init()
 
 
 def _maybe_backup():

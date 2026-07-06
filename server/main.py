@@ -455,6 +455,16 @@ async def backup_import(file: UploadFile = File(...)):
     return {"ok": True}
 
 
+@app.post("/api/reset")
+def reset_all_data():
+    """Wipe everything back to a fresh install (debug / start over)."""
+    try:
+        backup.reset_all()
+        return {"ok": True}
+    except Exception as e:
+        return JSONResponse({"error": f"Reset failed: {e}"}, status_code=500)
+
+
 @app.get("/api/dictionary")
 def dictionary_search(q: str = ""):
     return {"results": dictionary.search(q)}
