@@ -7,6 +7,7 @@ Snapshots use the SQLite backup API, so they're safe while the app is writing.
 import os
 import shutil
 import sqlite3
+import sys
 import tempfile
 import threading
 import time
@@ -101,7 +102,8 @@ def _sanitize_cross_platform():
     fixes = {}
     voice = db.get_setting("voice") or ""
     if voice and not (voice.startswith("vv:")
-                      or (voice.startswith("say:") and shutil.which("say"))):
+                      or (voice.startswith("say:") and shutil.which("say"))
+                      or (voice.startswith("sapi:") and sys.platform == "win32")):
         fixes["voice"] = ""  # falls back to tts.default_voice()
     d = db.get_setting("backup_dir") or ""
     if d and not os.path.isdir(d) and not os.path.isdir(os.path.dirname(d)):
