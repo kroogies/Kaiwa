@@ -856,6 +856,26 @@ async function loadReview() {
   reviewQueue = d.due; reviewIdx = 0;
   renderReviewCard();
 }
+// Mirrors db.srs_review() so each grade button can show when the word would
+// come back (like Anki's "10m / 1d / 3d" labels).
+function srsPreview(w) {
+  const fmt = d => d < 30 ? `${Math.round(d)}d` : d < 365 ? `${Math.round(d / 30)}mo` : `${(d / 365).toFixed(1)}y`;
+  const next = g => {
+    if (g === 0) return "10 min";
+    const q = { 1: 3, 2: 4, 3: 5 }[g];
+    const ease = Math.max(1.3, (w.ease || 2.5) + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02)));
+    const reps = (w.reps || 0) + 1;
+    let interval;
+    if (reps === 1) interval = 1;
+    else if (reps === 2) interval = g >= 2 ? 3 : 2;
+    else {
+      const mult = { 1: 1.2, 2: ease, 3: ease * 1.3 }[g];
+      interval = Math.max(w.interval_days * mult, w.interval_days + 1);
+    }
+    return fmt(interval);
+  };
+  return [next(0), next(1), next(2), next(3)];
+}
 function renderReviewCard() {
   const area = $("#review-area");
   refreshDueBadge();
@@ -865,6 +885,7 @@ function renderReviewCard() {
     return;
   }
   const w = reviewQueue[reviewIdx];
+  const iv = srsPreview(w);
   area.innerHTML = `
     <p class="review-count">${reviewIdx + 1} / ${reviewQueue.length}</p>
     <div class="flashcard" id="fc">
@@ -874,9 +895,15 @@ function renderReviewCard() {
       ${w.example ? `<div class="example hidden">${esc(w.example)}<br><i>${esc(w.example_en || "")}</i></div>` : ""}
       <p class="sub" id="fc-hint" style="margin-top:16px">tap to reveal</p>
     </div>
-    <div class="grade-row hidden" id="grades">
-      <button class="g-again">Again</button><button class="g-hard">Hard</button>
-      <button class="g-good">Good</button><button class="g-easy">Easy</button>
+    <div class="hidden" id="grades">
+      <p class="sub grade-hint">How well did you remember?</p>
+      <div class="grade-row">
+        <button class="g-again" title="Forgot it — the word starts over and comes right back">Again<span>${iv[0]}</span></button>
+        <button class="g-hard" title="Got it, but it was a struggle — small step forward">Hard<span>${iv[1]}</span></button>
+        <button class="g-good" title="Remembered it after a moment — normal step forward">Good<span>${iv[2]}</span></button>
+        <button class="g-easy" title="Knew it instantly — big step forward">Easy<span>${iv[3]}</span></button>
+      </div>
+      <p class="sub grade-hint">the time under each button is when you'll see the word again</p>
     </div>
     <div style="text-align:center;margin-top:12px"><button class="btn small" id="fc-play">${icon("volume-2")} Listen</button></div>`;
   $("#fc-play").addEventListener("click", () => playTTS(w.word, 1.0));
@@ -1028,6 +1055,13 @@ $("#import-file").addEventListener("change", async () => {
   const r = await resp.json();
   if (r.error) { $("#backup-status").textContent = r.error; return; }
   location.reload(); // everything (profile, words, streak) just changed
+});
+$("#reset-data").addEventListener("click", async () => {
+  if (!confirm("Delete ALL data — profile, saved words, streak, and history?")) return;
+  if (!confirm("Really sure? This wipes everything back to a fresh install.\n(A safety copy is kept next to the database.)")) return;
+  const r = await api.post("/api/reset", {});
+  if (r.error) { $("#backup-status").textContent = r.error; return; }
+  location.reload(); // fresh db → onboarding starts over
 });
 
 async function renderPhoneSetup() {

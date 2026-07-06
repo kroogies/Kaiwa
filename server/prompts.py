@@ -141,11 +141,15 @@ Return ONLY JSON with this exact shape:
   "errors": [
     {{"wrong": "the incorrect fragment", "right": "the corrected fragment", "explanation": "ONE short English sentence explaining why", "category": "particle|verb form|word choice|word order|politeness|spelling|other"}}
   ],
-  "praise": "ONE short encouraging English sentence about what they did well"
+  "praise": "ONE short encouraging English sentence about what they did well. If they correctly used a kanji or word above their level ({level}), name it and celebrate that specifically"
 }}
 
 Rules:
 - Only flag real errors, not stylistic preferences. Casual form is fine if consistent.
+- Using kanji is NEVER an error, no matter the student's level. Do NOT tell the student to
+  write a correctly-used kanji in hiragana. If they correctly use a kanji or word that is
+  above their level, celebrate that in "praise" instead. Only flag kanji when it is the
+  wrong character for the intended word (category "spelling" or "word choice").
 - If the message is in English or not Japanese, set has_errors=false, errors=[], and praise to a gentle nudge to try Japanese.
 - Maximum 3 errors (most important first).
 IMPORTANT: "explanation" and "praise" MUST be written in ENGLISH — the student is an
