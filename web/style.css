@@ -97,10 +97,13 @@ h1 { font-size: 1.7rem; font-weight: 800; }
 .mode-card.free { background: linear-gradient(135deg, #fdeef1, #fff); }
 .mode-card.custom { background: linear-gradient(135deg, #eeeefa, #fff); }
 .mode-card.call { background: linear-gradient(135deg, #e7f6ef, #fff); }
+.mode-card.story { background: linear-gradient(135deg, #fdf3e3, #fff); }
 .mode-card.free .mode-icon { color: var(--accent); }
 .mode-card.custom .mode-icon { color: var(--indigo); }
 .mode-card.call .mode-icon { color: var(--green); }
+.mode-card.story .mode-icon { color: var(--amber); }
 .mode-card.call:hover { border-color: var(--green); }
+.mode-card.story:hover { border-color: var(--amber); }
 .mode-icon { width: 2.1rem; height: 2.1rem; }
 .mode-card h3 { margin: 8px 0 4px; }
 .mode-card p { color: var(--sub); font-size: .9rem; }
@@ -143,6 +146,7 @@ h1 { font-size: 1.7rem; font-weight: 800; }
 .bubble {
   padding: 13px 16px; border-radius: 18px; line-height: 2.1;
   font-size: 1.12rem; box-shadow: var(--shadow); position: relative;
+  white-space: pre-wrap;  /* stories are multi-line — keep the line breaks */
 }
 .msg.ai .bubble { background: var(--panel); border-bottom-left-radius: 6px; }
 .msg.user .bubble { background: var(--indigo); color: #fff; border-bottom-right-radius: 6px; line-height: 1.6; }
@@ -288,6 +292,7 @@ ruby rt { font-size: .5em; color: var(--accent); font-weight: 600; }
 }
 .card input[type=text]:focus, .card select:focus { border-color: var(--indigo); }
 .level-row { display: flex; gap: 6px; margin-top: 6px; }
+.level-row.wrap { flex-wrap: wrap; margin-bottom: 14px; }
 .level-row button {
   flex: 1; padding: 9px 4px; border: 2px solid var(--border); background: var(--panel);
   border-radius: 10px; font-weight: 800; color: var(--sub); line-height: 1.3;

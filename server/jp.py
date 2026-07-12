@@ -179,7 +179,21 @@ def annotate(text: str) -> list:
 
     Returns list of tokens:
       {"surface": str, "ruby": [{"t","r"}], "reading": hira, "pos": str, "word": bool}
+
+    Newlines survive as their own non-word tokens (stories are multi-line;
+    the tokenizer would otherwise swallow them).
     """
+    out = []
+    lines = text.split("\n")
+    for i, line in enumerate(lines):
+        if i:
+            out.append({"surface": "\n", "ruby": [{"t": "\n", "r": None}],
+                        "reading": None, "pos": "空白", "word": False})
+        out.extend(_annotate_line(line))
+    return out
+
+
+def _annotate_line(text: str) -> list:
     out = []
     for surface, kana, pos in _tokenize(text):
         if not surface:
@@ -200,6 +214,18 @@ def annotate(text: str) -> list:
             "word": is_word,
         })
     return out
+
+
+def kanji_to_kana(text: str) -> str:
+    """Rewrite kanji words as their hiragana readings (hiragana-only script mode —
+    small local models can't be trusted to obey 'no kanji' on their own)."""
+    out = []
+    for surface, kana, pos in _tokenize(text):
+        if has_kanji(surface) and kana:
+            out.append(kata_to_hira(kana))
+        else:
+            out.append(surface)
+    return "".join(out)
 
 
 def lemma_of(word: str) -> str | None:

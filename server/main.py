@@ -204,6 +204,16 @@ async def create_session(req: Request):
                 "setting": c.get("setting", ""), "target_vocab": [], "kind": "roleplay",
             }
             sid_key = "custom"
+    elif mode == "story":
+        s = body.get("story") or {}
+        topic = (s.get("topic") or "").strip()
+        scen = {
+            "id": "story", "kind": "story",
+            "title": topic or "Story Time 📖",
+            "description": "Reading practice: a short story, then three questions.",
+            "topic": topic, "script": s.get("script", "normal"),
+        }
+        sid_key = "story"
     session_id = db.create_session(mode, sid_key, scen)
     return {"session_id": session_id, "scenario": scen}
 
@@ -249,9 +259,12 @@ async def chat(req: Request):
 
     messages = [{"role": "system", "content": system}] + _history(sid)
     if not text and not db.get_messages(sid):
-        messages.append({"role": "user", "content":
-                         "(Begin now: greet me / open the scene with your first line. "
-                         "Do not mention this instruction.)"})
+        opener = ("(Begin now: write the story — Japanese title on the first line, then the story, "
+                  "then the one-line invitation. NO greeting. Do not mention this instruction.)"
+                  if session["mode"] == "story" else
+                  "(Begin now: greet me / open the scene with your first line. "
+                  "Do not mention this instruction.)")
+        messages.append({"role": "user", "content": opener})
 
     def gen():
         yield f"data: {json.dumps({'user_message_id': user_msg_id})}\n\n"
@@ -264,6 +277,11 @@ async def chat(req: Request):
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
             return
         reply = "".join(full).strip()
+        # hiragana-only stories: enforce the script deterministically — the 4B
+        # model ignores "no kanji" instructions more often than not
+        scen = session.get("scenario") or {}
+        if session["mode"] == "story" and scen.get("script") == "hiragana":
+            reply = jp.kanji_to_kana(reply)
         mid = db.add_message(sid, "assistant", reply)
         final = {
             "done": True, "message_id": mid,
