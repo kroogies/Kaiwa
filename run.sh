@@ -28,6 +28,16 @@ if [ -x "vendor/macos-x64/run" ]; then
   fi
 fi
 
+# 2b. AivisSpeech (optional — emotional / anime-style voices, VOICEVOX-compatible API)
+if ! curl -s --max-time 2 http://127.0.0.1:10101/version >/dev/null; then
+  AIVIS="vendor/aivisspeech-engine/run"
+  [ -x "$AIVIS" ] || AIVIS=$(find /Applications/AivisSpeech.app -maxdepth 5 -name run -type f 2>/dev/null | head -1)
+  if [ -x "$AIVIS" ]; then
+    echo "▶ starting AivisSpeech engine…"
+    (cd "$(dirname "$AIVIS")" && ./run --host 127.0.0.1 --port 10101 >/tmp/aivisspeech.log 2>&1 &)
+  fi
+fi
+
 # 3. Tailscale HTTPS link (optional — lets your phone reach Kaiwa from anywhere)
 TS="/Applications/Tailscale.app/Contents/MacOS/Tailscale"
 if [ -x "$TS" ] && "$TS" status >/dev/null 2>&1; then

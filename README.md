@@ -81,7 +81,22 @@ Out of the box Kaiwa speaks with your OS's built-in Japanese voice. For much
 nicer voices, download the [VOICEVOX engine](https://github.com/VOICEVOX/voicevox_engine/releases)
 (CPU build for your OS) and unzip it into `vendor/` (e.g. `vendor/macos-x64/`
 so that `vendor/macos-x64/run` exists). `run.sh` picks it up automatically, and
-a voice picker (with preview) appears in Settings.
+a voice picker (with preview) appears in Settings. Every VOICEVOX character ×
+emotion style (sweet, tsundere, whisper…) shows up there, and the
+**Expressiveness** slider in Settings makes any of them swing harder.
+
+### Anime-style voices (optional)
+
+For the most natural, emotional voices, install [AivisSpeech](https://aivis-project.com/)
+(free, Windows/macOS) and add character voice models from
+[AivisHub](https://hub.aivis-project.com/) inside the app — 60+ free
+anime-style voices. Its engine speaks the VOICEVOX API, so Kaiwa detects it
+automatically (`run.sh` even starts it for you if installed) and its voices
+appear in the same Settings picker. Heads-up: it's a heavier model than
+VOICEVOX — on older CPU-only machines each sentence takes a few seconds to
+synthesize (cached after the first time). Headless alternative: unzip
+[AivisSpeech-Engine](https://github.com/Aivis-Project/AivisSpeech-Engine/releases)
+into `vendor/aivisspeech-engine/`.
 
 ## Use it on your phone 📱
 
@@ -116,8 +131,8 @@ Logs land in `/tmp/ollama.log` and `/tmp/voicevox.log`.
 ## The stack
 
 FastAPI + SQLite + vanilla JS (no build step). STT: whisper.cpp. TTS: VOICEVOX,
-macOS `say`, or Windows SAPI. Tokenizer/furigana: fugashi (UniDic). LLM: Ollama
-or Gemini/OpenAI/Anthropic over plain HTTP.
+AivisSpeech, macOS `say`, or Windows SAPI. Tokenizer/furigana: fugashi (UniDic).
+LLM: Ollama or Gemini/OpenAI/Anthropic over plain HTTP.
 
 ## Contributing
 

@@ -73,6 +73,7 @@ def health():
         "models": llm.list_models(),
         "whisper": stt.available(),
         "voicevox": tts.voicevox_up(),
+        "aivis": tts.engine_up("aivis"),
         "tokenizer": jp.backend_name(),
         "dictionary": dictionary.available(),
     }
@@ -148,6 +149,7 @@ def get_profile():
     s.setdefault("provider", "ollama")
     s.setdefault("voice", tts.default_voice())
     s.setdefault("speed", 1.0)
+    s.setdefault("intonation", 1.0)
     s.setdefault("auto_play", True)
     s.setdefault("furigana", True)
     s.setdefault("romaji", False)
@@ -482,10 +484,11 @@ async def api_stt(audio: UploadFile = File(...)):
 
 
 @app.get("/api/tts")
-def api_tts(text: str, voice: str = "", speed: float = 1.0):
+def api_tts(text: str, voice: str = "", speed: float = 1.0, intonation: float | None = None):
     v = voice or setting("voice") or tts.default_voice()
+    into = intonation if intonation is not None else float(setting("intonation") or 1.0)
     try:
-        wav = tts.synthesize(text, v, speed)
+        wav = tts.synthesize(text, v, speed, into)
     except Exception:
         wav = tts.synthesize(text, "say:Kyoko", speed)  # engine fallback
     if not wav:

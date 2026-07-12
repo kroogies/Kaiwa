@@ -103,7 +103,7 @@ async function updateHealth() {
     $("#health").innerHTML =
       `${dot(h.llm_ready)} LLM ${llmLabel}<br>` +
       `${dot(h.whisper)} whisper (voice in)<br>` +
-      `${dot(h.voicevox)} ${h.voicevox ? "VOICEVOX" : "macOS voice"} (voice out)`;
+      `${dot(h.voicevox || h.aivis)} ${[h.aivis && "Aivis", h.voicevox && "VOICEVOX"].filter(Boolean).join(" + ") || "macOS voice"} (voice out)`;
   } catch { $("#health").innerHTML = `<span class="bad">●</span> server offline`; }
 }
 
@@ -1059,9 +1059,12 @@ async function loadSettings() {
   const cur = p.settings.voice || v.default;
   $("#set-voice").innerHTML = v.voices.map(x =>
     `<option value="${x.id}" ${x.id === cur ? "selected" : ""}>${x.label} (${x.engine})</option>`).join("");
+  $("#aivis-hint").classList.toggle("hidden", v.voices.some(x => x.engine === "AivisSpeech"));
 
   $("#set-speed").value = p.settings.speed || 1.0;
   $("#speed-val").textContent = `${$("#set-speed").value}×`;
+  $("#set-intonation").value = p.settings.intonation ?? 1.0;
+  $("#intonation-val").textContent = `${$("#set-intonation").value}×`;
   $("#set-autoplay").checked = p.settings.auto_play !== false;
   $("#set-autotranslate").checked = !!p.settings.auto_translate;
 
@@ -1145,16 +1148,18 @@ function renderProviderUI() {
 $("#set-provider").addEventListener("change", renderProviderUI);
 
 $("#set-speed").addEventListener("input", () => $("#speed-val").textContent = `${$("#set-speed").value}×`);
-/* voice preview: speak a sample with the currently selected (unsaved) voice + speed */
+$("#set-intonation").addEventListener("input", () => $("#intonation-val").textContent = `${$("#set-intonation").value}×`);
+/* voice preview: speak a sample with the currently selected (unsaved) voice + sliders */
 let previewAudio = null;
 $("#voice-preview").addEventListener("click", () => {
   const btn = $("#voice-preview");
   if (previewAudio) { previewAudio.pause(); previewAudio = null; }
   const v = $("#set-voice").value;
   const s = parseFloat($("#set-speed").value) || 1.0;
+  const i = parseFloat($("#set-intonation").value) || 1.0;
   btn.innerHTML = icon("loader", "spin");
   const reset = () => { btn.innerHTML = icon("volume-2"); };
-  previewAudio = new Audio(`/api/tts?text=${encodeURIComponent("こんにちは、カイワです。よろしくお願いします！")}&speed=${s}&voice=${encodeURIComponent(v)}`);
+  previewAudio = new Audio(`/api/tts?text=${encodeURIComponent("こんにちは、カイワです。よろしくお願いします！")}&speed=${s}&intonation=${i}&voice=${encodeURIComponent(v)}`);
   previewAudio.addEventListener("playing", reset);
   previewAudio.addEventListener("error", reset);
   previewAudio.play().catch(reset);
@@ -1176,6 +1181,7 @@ $("#save-settings").addEventListener("click", async () => {
     provider: prov,
     voice: $("#set-voice").value,
     speed: parseFloat($("#set-speed").value),
+    intonation: parseFloat($("#set-intonation").value),
     auto_play: $("#set-autoplay").checked,
     auto_translate: $("#set-autotranslate").checked,
     furigana: $("#tgl-furigana").checked,
