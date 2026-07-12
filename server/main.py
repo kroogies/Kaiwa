@@ -349,7 +349,7 @@ async def word(req: Request):
     info = jp.word_info(w)
 
     # 1) JMdict: instant + accurate. Try surface form, then dictionary form.
-    entry = dictionary.lookup(w)
+    entry = dictionary.lookup(w, info["reading"])
     lemma = jp.lemma_of(w)
     conjugated = False
     if not entry and lemma and lemma != w:
@@ -501,9 +501,37 @@ def vocab_list():
     return {"vocab": db.list_vocab()}
 
 
+def _root_form(b: dict) -> dict:
+    """Store dictionary forms, not conjugations/particles (食べました → 食べる).
+
+    Only swaps when JMdict confirms the lemma, so we never trade a real word
+    for a bad tokenizer guess.
+    """
+    w = (b.get("word") or "").strip()
+    b = {**b, "word": w}
+    if not w or dictionary.lookup(w):  # already a dictionary form
+        return b
+    # Conjugated verbs/adjectives want the lemma (食べました → 食べる); anything
+    # else wants the first-token surface, which keeps the user's orthography
+    # while shedding trailing particles (ご飯を → ご飯, not the lemma's 御飯).
+    toks = jp.annotate(w)
+    first = toks[0]["surface"] if toks else ""
+    cands = (jp.lemma_of(w), first) if toks and toks[0]["pos"] in ("動詞", "形容詞") \
+        else (first, jp.lemma_of(w))
+    for cand in cands:
+        if not cand or cand == w:
+            continue
+        info = jp.word_info(cand)
+        entry = dictionary.lookup(cand, info["reading"])
+        if entry:
+            return {**b, "word": cand, "reading": entry["reading"] or info["reading"],
+                    "romaji": info["romaji"], "meaning": entry["meaning"]}
+    return b
+
+
 @app.post("/api/vocab")
 async def vocab_add(req: Request):
-    b = await req.json()
+    b = _root_form(await req.json())
     row = db.add_vocab(b["word"], b.get("reading", ""), b.get("romaji", ""),
                        b.get("meaning", ""), b.get("example", ""), b.get("example_en", ""))
     return row

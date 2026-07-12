@@ -115,16 +115,22 @@ def search(query: str, limit: int = 30) -> list:
     return out
 
 
-def lookup(word: str) -> dict | None:
-    """Exact-form lookup; prefers common entries."""
+def lookup(word: str, reading: str | None = None) -> dict | None:
+    """Exact-form lookup; prefers common entries.
+
+    `reading` (hiragana) disambiguates homographs: 本 is ほん "book" or
+    もと "origin" — without it you get whichever JMdict ranks first.
+    """
     con = _conn()
     if con is None or not word:
         return None
     rows = con.execute(
-        "SELECT * FROM entries WHERE form=? ORDER BY common DESC LIMIT 3", (word,)
+        "SELECT * FROM entries WHERE form=? ORDER BY common DESC LIMIT 10", (word,)
     ).fetchall()
     if not rows:
         return None
     best = rows[0]
+    if reading:
+        best = next((r for r in rows if r["reading"] == reading), best)
     return {"meaning": best["gloss"], "reading": best["reading"],
             "pos": best["pos"], "common": bool(best["common"])}

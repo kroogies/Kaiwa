@@ -47,8 +47,40 @@ function show(view) {
   if (view === "dict") $("#dict-search").focus();
   if (view === "progress") loadProgress();
   if (view === "settings") loadSettings();
+  updateResumePill(view);
 }
 $$(".nav-btn").forEach(b => b.addEventListener("click", () => show(b.dataset.view)));
+
+/* an active chat isn't lost when you switch tabs — tap the pill to get back */
+function updateResumePill(view) {
+  const active = state.session && state.session.mode !== "call";
+  $("#resume-pill").classList.toggle("hidden", !(active && view !== "chat"));
+  if (active) $("#resume-title").textContent = $("#chat-title").textContent;
+}
+$("#resume-pill").addEventListener("click", () => show("chat"));
+
+/* starting a new session over an active one asks first (report / discard / stay) */
+let pendingStart = null;
+function guardActiveSession(startFn) {
+  pendingStart = startFn;
+  $("#switch-title").textContent = $("#chat-title").textContent;
+  $("#switch-modal").classList.remove("hidden");
+}
+$("#switch-cancel").addEventListener("click", () => {
+  pendingStart = null;
+  $("#switch-modal").classList.add("hidden");
+  show("chat");
+});
+$("#switch-skip").addEventListener("click", () => {
+  $("#switch-modal").classList.add("hidden");
+  state.session = null;
+  const go = pendingStart; pendingStart = null;
+  if (go) go();
+});
+$("#switch-report").addEventListener("click", () => {
+  $("#switch-modal").classList.add("hidden");
+  showSessionSummary();       // pendingStart continues after "Done ✓"
+});
 
 /* =============================================================== startup */
 async function boot() {
@@ -275,6 +307,7 @@ $("#cr-start").addEventListener("click", () => {
 
 /* ================================================================== chat */
 async function startSession(mode, opts) {
+  if (state.session) return guardActiveSession(() => startSession(mode, opts));
   const res = await api.post("/api/sessions", { mode, ...opts });
   state.session = { ...res, mode };
   const scen = res.scenario;
@@ -439,13 +472,16 @@ async function queueCorrection(mid, userDiv) {
 $("#hint-btn").addEventListener("click", async () => {
   if (!state.session) return;
   const h = $("#hints");
+  if (!h.classList.contains("hidden")) { h.classList.add("hidden"); return; }  // toggle off
   h.classList.remove("hidden");
   h.innerHTML = `<div class="hint-card">${icon("lightbulb")} thinking…</div>`;
   const r = await api.post("/api/hint", { session_id: state.session.session_id });
-  h.innerHTML = (r.suggestions || []).map(s =>
+  h.innerHTML = ((r.suggestions || []).map(s =>
     `<div class="hint-card" data-t="${esc(s.japanese)}">${esc(s.japanese)}` +
     `<span class="en">${esc(s.romaji || "")} — ${esc(s.english || "")}</span></div>`).join("")
-    || `<div class="hint-card">Couldn't think of hints, sorry!</div>`;
+    || `<div class="hint-card">Couldn't think of hints, sorry!</div>`) +
+    `<button class="hint-close" title="Close hints">${icon("x")}</button>`;
+  $(".hint-close", h).addEventListener("click", () => h.classList.add("hidden"));
   $$(".hint-card", h).forEach(c => c.addEventListener("click", () => {
     if (c.dataset.t) { $("#chat-input").value = c.dataset.t; h.classList.add("hidden"); $("#chat-input").focus(); }
   }));
@@ -493,7 +529,8 @@ async function showSessionSummary() {
   $("#sum-close").addEventListener("click", () => {
     $("#summary-modal").classList.add("hidden");
     state.session = null;
-    show("home");
+    const go = pendingStart; pendingStart = null;
+    if (go) go(); else show("home");
   });
 }
 
@@ -617,6 +654,7 @@ $("#call-cc").addEventListener("click", () => {
 });
 
 async function startCall() {
+  if (state.session) return guardActiveSession(startCall);
   const res = await api.post("/api/sessions", { mode: "call" });
   state.session = { ...res, mode: "call" };
   Object.assign(call, {

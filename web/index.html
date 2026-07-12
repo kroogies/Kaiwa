@@ -208,6 +208,23 @@
 
 <!-- Word popup -->
 <div id="word-pop" class="popup hidden"><div class="popup-inner" id="word-pop-inner"></div></div>
+<!-- Resume-session pill: an active chat survives tab switches -->
+<button id="resume-pill" class="resume-pill hidden">
+  <svg class="icon"><use href="/static/icons.svg#message-circle"/></svg>
+  <span id="resume-title">Back to session</span>
+</button>
+<!-- Switch-session confirm modal -->
+<div id="switch-modal" class="modal hidden">
+  <div class="modal-inner">
+    <h2><svg class="icon"><use href="/static/icons.svg#messages-square"/></svg> Finish current session?</h2>
+    <p class="sub">You're still in &ldquo;<span id="switch-title"></span>&rdquo;. Get your session report before starting the new one?</p>
+    <div class="modal-btns">
+      <button class="btn" id="switch-cancel">Keep talking</button>
+      <button class="btn" id="switch-skip">Start new</button>
+      <button class="btn primary" id="switch-report">Report &amp; finish</button>
+    </div>
+  </div>
+</div>
 <!-- Custom roleplay modal -->
 <div id="custom-modal" class="modal hidden">
   <div class="modal-inner">
