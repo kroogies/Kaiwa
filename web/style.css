@@ -184,6 +184,21 @@ ruby rt { font-size: .5em; color: var(--accent); font-weight: 600; }
 }
 .hint-card:hover { transform: translateY(-1px); }
 .hint-card .en { color: var(--sub); font-size: .74rem; display: block; }
+.hint-close {
+  align-self: center; background: none; border: none; padding: 6px;
+  color: var(--sub); cursor: pointer; display: flex;
+}
+.hint-close:hover { color: var(--ink); }
+
+.resume-pill {
+  position: fixed; right: 18px; bottom: 18px; z-index: 40;
+  display: flex; align-items: center; gap: 8px;
+  background: var(--indigo); color: #fff; border: none; border-radius: 999px;
+  padding: 12px 18px; font-size: .9rem; font-weight: 600; cursor: pointer;
+  box-shadow: 0 4px 16px rgba(45, 42, 50, .3); transition: transform .1s;
+}
+.resume-pill:hover { transform: translateY(-1px); }
+.resume-pill .icon { width: 18px; height: 18px; }
 
 .composer {
   display: flex; gap: 10px; align-items: center;
@@ -466,4 +481,5 @@ ruby rt { font-size: .5em; color: var(--accent); font-weight: 600; }
   .chat-tools { gap: 9px; }
   .chat-tools .mini-toggle { font-size: .72rem; }
   .composer { padding: 10px 12px calc(12px + env(safe-area-inset-bottom)); gap: 7px; }
+  .resume-pill { bottom: calc(70px + env(safe-area-inset-bottom)); }  /* above the tab bar */
 }
