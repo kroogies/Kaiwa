@@ -52,24 +52,29 @@ function show(view) {
 $$(".nav-btn").forEach(b => b.addEventListener("click", () => show(b.dataset.view)));
 
 /* an active chat isn't lost when you switch tabs — tap the pill to get back */
+const sessionView = () =>            // story sessions live in the reader, not chat
+  state.session && state.session.mode === "story" ? "reader" : "chat";
+const sessionTitle = () =>
+  (state.session && state.session.scenario && state.session.scenario.title) ||
+  $("#chat-title").textContent;
 function updateResumePill(view) {
   const active = state.session && state.session.mode !== "call";
-  $("#resume-pill").classList.toggle("hidden", !(active && view !== "chat"));
-  if (active) $("#resume-title").textContent = $("#chat-title").textContent;
+  $("#resume-pill").classList.toggle("hidden", !(active && view !== sessionView()));
+  if (active) $("#resume-title").textContent = sessionTitle();
 }
-$("#resume-pill").addEventListener("click", () => show("chat"));
+$("#resume-pill").addEventListener("click", () => show(sessionView()));
 
 /* starting a new session over an active one asks first (report / discard / stay) */
 let pendingStart = null;
 function guardActiveSession(startFn) {
   pendingStart = startFn;
-  $("#switch-title").textContent = $("#chat-title").textContent;
+  $("#switch-title").textContent = sessionTitle();
   $("#switch-modal").classList.remove("hidden");
 }
 $("#switch-cancel").addEventListener("click", () => {
   pendingStart = null;
   $("#switch-modal").classList.add("hidden");
-  show("chat");
+  show(sessionView());
 });
 $("#switch-skip").addEventListener("click", () => {
   $("#switch-modal").classList.add("hidden");
@@ -324,6 +329,7 @@ async function startSession(mode, opts) {
   if (state.session) return guardActiveSession(() => startSession(mode, opts));
   const res = await api.post("/api/sessions", { mode, ...opts });
   state.session = { ...res, mode };
+  if (mode === "story") return openReader(res);   // stories get the book UI
   const scen = res.scenario;
   $("#chat-title").textContent = scen ? `${scen.title}` : "Free Chat 💬";
   $("#chat-sub").textContent = scen ? (scen.setting || scen.description || "") : "Talk about anything!";
@@ -363,6 +369,34 @@ function renderTokens(tokens) {
 }
 const esc = s => s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
+/* shared SSE pump for /api/chat — chat bubbles and the story reader both use it */
+async function streamChat(text, h) {
+  const resp = await fetch("/api/chat", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ session_id: state.session.session_id, text }),
+  });
+  if (!resp.ok) throw new Error((await resp.json()).error || resp.statusText);
+  const reader = resp.body.getReader();
+  const dec = new TextDecoder();
+  let buf = "", raw = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    let idx;
+    while ((idx = buf.indexOf("\n\n")) >= 0) {
+      const line = buf.slice(0, idx).trim();
+      buf = buf.slice(idx + 2);
+      if (!line.startsWith("data: ")) continue;
+      const ev = JSON.parse(line.slice(6));
+      if (ev.user_message_id && h.onUser) h.onUser(ev.user_message_id);
+      if (ev.error) { h.onError(ev.error); return; }
+      if (ev.delta) { raw += ev.delta; h.onDelta(raw); }
+      if (ev.done) h.onDone(ev, raw);
+    }
+  }
+}
+
 async function sendChat(text) {
   if (state.busy || !state.session) return;
   state.busy = true;
@@ -379,37 +413,18 @@ async function sendChat(text) {
   bubble.innerHTML = `<span class="typing"><span></span><span></span><span></span></span>`;
   scrollDown();
 
+  let started = false;
   try {
-    const resp = await fetch("/api/chat", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ session_id: state.session.session_id, text }),
+    await streamChat(text, {
+      onUser: mid => { if (userDiv) queueCorrection(mid, userDiv); },
+      onError: msg => { bubble.textContent = "⚠️ " + msg; },
+      onDelta: raw => {
+        if (!started) { bubble.textContent = ""; started = true; }
+        bubble.textContent = raw;
+        scrollDown();
+      },
+      onDone: (ev, raw) => finishAiMessage(aiDiv, ev, raw),
     });
-    if (!resp.ok) throw new Error((await resp.json()).error || resp.statusText);
-    const reader = resp.body.getReader();
-    const dec = new TextDecoder();
-    let buf = "", raw = "", started = false;
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += dec.decode(value, { stream: true });
-      let idx;
-      while ((idx = buf.indexOf("\n\n")) >= 0) {
-        const line = buf.slice(0, idx).trim();
-        buf = buf.slice(idx + 2);
-        if (!line.startsWith("data: ")) continue;
-        const ev = JSON.parse(line.slice(6));
-        if (ev.user_message_id && userDiv) queueCorrection(ev.user_message_id, userDiv);
-        if (ev.error) { bubble.textContent = "⚠️ " + ev.error; break; }
-        if (ev.delta) {
-          raw += ev.delta;
-          if (!started) { bubble.textContent = ""; started = true; }
-          bubble.textContent = raw;
-          scrollDown();
-        }
-        if (ev.done) finishAiMessage(aiDiv, ev, raw);
-      }
-    }
   } catch (e) {
     bubble.textContent = "⚠️ " + e.message;
   }
@@ -546,6 +561,179 @@ async function showSessionSummary() {
     const go = pendingStart; pendingStart = null;
     if (go) go(); else show("home");
   });
+}
+
+/* ========================================================== story reader */
+/* Story mode renders as book pages instead of chat bubbles: page 1 is the
+   story itself, each quiz turn becomes the next page. Same /api/chat session
+   underneath, so resume, reports, and corrections all keep working. */
+const reader = { pages: [], cur: 0 };
+const TYPING = `<span class="typing"><span></span><span></span><span></span></span>`;
+
+function openReader(res) {
+  const scen = res.scenario || {};
+  $("#reader-title").textContent = scen.title || "Story Time";
+  $("#reader-sub").textContent =
+    ({ hiragana: "ひらがな only", katakana: "カタカナ practice", stretch: "kanji stretch" })[scen.script] || "";
+  reader.pages = []; reader.cur = 0;
+  $("#reader-pages").innerHTML = "";
+  $("#reader-nav").classList.add("hidden");
+  $("#rd-furigana").checked = state.settings.furigana !== false;
+  $("#rd-romaji").checked = !!state.settings.romaji;
+  applyReaderToggles();
+  show("reader");
+  readerStream("", addReaderPage("story"));   // AI opens by writing the story
+}
+
+$("#reader-back").addEventListener("click", () => show("home"));
+$("#reader-end").addEventListener("click", showSessionSummary);
+$("#rd-prev").addEventListener("click", () => readerGo(reader.cur - 1));
+$("#rd-next").addEventListener("click", () => readerGo(reader.cur + 1));
+$("#rd-furigana").addEventListener("change", applyReaderToggles);
+$("#rd-romaji").addEventListener("change", applyReaderToggles);
+function applyReaderToggles() {
+  $("#reader-pages").classList.toggle("no-furigana", !$("#rd-furigana").checked);
+  $("#reader-pages").classList.toggle("show-romaji", $("#rd-romaji").checked);
+}
+
+function addReaderPage(type) {
+  const div = document.createElement("div");
+  div.className = `reader-page ${type}`;
+  if (type === "story") {
+    div.innerHTML = `
+      <h2 class="story-title"></h2>
+      <div class="story-body">${TYPING}</div>
+      <div class="romaji-line"></div><div class="trans-line hidden"></div>
+      <div class="msg-actions reader-actions"></div>
+      <div class="reader-cta hidden"><button class="btn primary">Start the quiz ➤</button></div>`;
+  } else {
+    // story is page 0; quiz pages 1-3 are the questions, 4 is the wrap-up
+    const n = reader.pages.length;
+    const label = n <= 3 ? `Question ${n} <span class="of">/ 3</span>`
+      : n === 4 ? `${icon("party-popper")} Story complete!`
+      : `${icon("message-circle")} Chat`;
+    div.innerHTML = `
+      <div class="quiz-label">${label}</div>
+      <div class="quiz-body">${TYPING}</div>
+      <div class="romaji-line"></div><div class="trans-line hidden"></div>
+      <div class="msg-actions reader-actions"></div>
+      <div class="quiz-after"></div>
+      <div class="quiz-answer hidden">
+        <input type="text" placeholder="${n <= 3 ? "Answer in Japanese…" : "Reply…"}" autocomplete="off">
+        <button class="icon-btn big send" title="Send">${icon("send-horizontal")}</button>
+      </div>`;
+  }
+  $("#reader-pages").appendChild(div);
+  reader.pages.push(div);
+  readerGo(reader.pages.length - 1);
+  return div;
+}
+
+function readerGo(i) {
+  reader.cur = Math.max(0, Math.min(i, reader.pages.length - 1));
+  reader.pages.forEach((p, j) => p.classList.toggle("hidden", j !== reader.cur));
+  $("#reader-pages").scrollTop = 0;
+  updateReaderNav();
+}
+
+function updateReaderNav() {
+  const dots = $("#rd-dots");
+  dots.innerHTML = reader.pages.map((p, j) =>
+    `<button class="rd-dot ${j === reader.cur ? "on" : ""}" data-i="${j}" ` +
+    `title="${j === 0 ? "Story" : "Page " + (j + 1)}">${j === 0 ? icon("book-open") : j}</button>`).join("");
+  $$(".rd-dot", dots).forEach(b => b.addEventListener("click", () => readerGo(+b.dataset.i)));
+  $("#rd-prev").disabled = reader.cur === 0;
+  $("#rd-next").disabled = reader.cur >= reader.pages.length - 1;
+  $("#reader-nav").classList.toggle("hidden", reader.pages.length < 2);
+}
+
+async function readerStream(text, page, correctEl) {
+  if (!state.session) return;
+  state.busy = true;
+  const isStory = page.classList.contains("story");
+  const body = $(isStory ? ".story-body" : ".quiz-body", page);
+  const title = isStory ? $(".story-title", page) : null;
+  let started = false;
+  try {
+    await streamChat(text, {
+      onUser: mid => { if (correctEl) queueCorrection(mid, correctEl); },
+      onError: msg => { body.textContent = "⚠️ " + msg; },
+      onDelta: raw => {
+        if (!started) { body.textContent = ""; started = true; }
+        if (title) {                     // first line of the story is its title
+          const nl = raw.indexOf("\n");
+          title.textContent = nl >= 0 ? raw.slice(0, nl).trim() : raw;
+          body.textContent = nl >= 0 ? raw.slice(nl + 1).replace(/^\n+/, "") : "";
+        } else body.textContent = raw;
+      },
+      onDone: (ev, raw) => finishReaderPage(page, ev, raw),
+    });
+  } catch (e) { body.textContent = "⚠️ " + e.message; }
+  state.busy = false;
+}
+
+function finishReaderPage(page, ev, raw) {
+  const isStory = page.classList.contains("story");
+  const body = $(isStory ? ".story-body" : ".quiz-body", page);
+  let toks = ev.tokens || [];
+  if (isStory) {
+    const nl = toks.findIndex(t => t.surface === "\n");
+    if (nl > 0) {
+      $(".story-title", page).innerHTML = renderTokens(toks.slice(0, nl));
+      toks = toks.slice(nl + 1);
+      while (toks.length && toks[0].surface === "\n") toks.shift();
+    }
+  }
+  body.innerHTML = renderTokens(toks);
+  $(".romaji-line", page).textContent = ev.romaji || "";
+
+  const actions = $(".reader-actions", page);
+  actions.innerHTML = `
+    <button class="act-play" title="Play">${icon("volume-2")} Play</button>
+    <button class="act-slow" title="Play slowly">${icon("turtle")} Slow</button>
+    <button class="act-trans" title="Translate">${icon("languages")} Translate</button>`;
+  $(".act-play", actions).addEventListener("click", () => playTTS(raw, 1.0));
+  $(".act-slow", actions).addEventListener("click", () => playTTS(raw, 0.7));
+  $(".act-trans", actions).addEventListener("click", () => translateMsg(ev.message_id, page));
+  $$(".tok", page).forEach(tok =>
+    tok.addEventListener("click", e => wordPopup(e, tok.dataset.w, raw)));
+
+  if (isStory) {
+    const cta = $(".reader-cta", page);
+    cta.classList.remove("hidden");
+    $("button", cta).addEventListener("click", () => {
+      cta.remove();                             // one story, one quiz
+      readerStream("はい、クイズをおねがいします！", addReaderPage("quiz"));
+    }, { once: true });
+  } else {
+    if (reader.pages.indexOf(page) === 4) {     // wrap-up page: offer the report
+      const after = $(".quiz-after", page);
+      after.innerHTML = `<button class="btn primary rd-finish">${icon("clipboard-list")} Finish &amp; get report</button>`;
+      $(".rd-finish", after).addEventListener("click", showSessionSummary);
+    }
+    wireQuizAnswer(page);
+    if (state.settings.auto_play !== false) playTTS(raw, 1.0);  // hear the question
+  }
+  updateReaderNav();
+}
+
+function wireQuizAnswer(page) {
+  const box = $(".quiz-answer", page);
+  box.classList.remove("hidden");
+  const inp = $("input", box), send = $("button", box);
+  const go = () => {
+    const t = inp.value.trim();
+    if (!t || state.busy) return;
+    box.classList.add("hidden");
+    const chip = document.createElement("div");   // the answer stays on its
+    chip.className = "your-answer";               // question page for review
+    chip.innerHTML = `<span class="ya-label">Your answer</span>${esc(t)}`;
+    $(".quiz-after", page).appendChild(chip);
+    readerStream(t, addReaderPage("quiz"), chip); // corrections land on the chip
+  };
+  send.addEventListener("click", go);
+  inp.addEventListener("keydown", e => { if (e.key === "Enter") go(); });
+  inp.focus();
 }
 
 /* ============================================================ word popup */

@@ -123,6 +123,7 @@ def tutor_system_prompt(profile: dict, mode: str, scenario: dict | None,
             "- End the first message with ONE short line inviting the student to say when they finished reading (e.g. 読み終わったら「読んだよ」と言ってね！).",
             "- AFTER the student replies, quiz them on the story: THREE comprehension questions total, in simple Japanese at the student's level. Questions must be answerable from the story text alone.",
             "- STRICT: each quiz message contains exactly ONE question — never two questions in the same message. One question, then wait for the answer.",
+            "- NEVER reveal the answer inside the question message — no (答え：…), no brackets with the answer. The student must find it in the story.",
             "- After each answer: say in one short sentence whether it was right (model the correct answer naturally if not), then ask the next question in the same message.",
             "- After the third answer: congratulate briefly, point out 2-3 useful words from the story, and ask if they'd like to talk about the story.",
         ]

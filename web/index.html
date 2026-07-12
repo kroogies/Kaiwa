@@ -86,6 +86,25 @@
       </footer>
     </section>
 
+    <!-- STORY READER (story mode gets a book-like page, not chat bubbles) -->
+    <section id="view-reader" class="view hidden">
+      <header class="chat-head">
+        <button id="reader-back" class="icon-btn" title="Back"><svg class="icon"><use href="/static/icons.svg#arrow-left"/></svg></button>
+        <div class="chat-title"><h2 id="reader-title">Story Time</h2><small id="reader-sub"></small></div>
+        <div class="chat-tools">
+          <label class="mini-toggle"><input type="checkbox" id="rd-furigana" checked><span>ふりがな</span></label>
+          <label class="mini-toggle"><input type="checkbox" id="rd-romaji"><span>romaji</span></label>
+          <button id="reader-end" class="btn danger small">End &amp; Review</button>
+        </div>
+      </header>
+      <div id="reader-pages"></div>
+      <footer id="reader-nav" class="reader-nav hidden">
+        <button id="rd-prev" class="icon-btn big" title="Previous page"><svg class="icon"><use href="/static/icons.svg#arrow-left"/></svg></button>
+        <div id="rd-dots" class="rd-dots"></div>
+        <button id="rd-next" class="icon-btn big" title="Next page"><svg class="icon flip-x"><use href="/static/icons.svg#arrow-left"/></svg></button>
+      </footer>
+    </section>
+
     <!-- REVIEW (SRS) -->
     <section id="view-review" class="view hidden">
       <h1><svg class="icon h1-icon"><use href="/static/icons.svg#layers"/></svg> Review</h1><p class="sub">Spaced repetition for the words you saved.</p>
