@@ -294,6 +294,20 @@ function scenCard(s) {
 
 $("#card-free").addEventListener("click", () => startSession("free_chat", {}));
 $("#card-custom").addEventListener("click", () => $("#custom-modal").classList.remove("hidden"));
+$("#card-story").addEventListener("click", () => $("#story-modal").classList.remove("hidden"));
+$("#st-cancel").addEventListener("click", () => $("#story-modal").classList.add("hidden"));
+$("#st-script").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  $$("#st-script button").forEach(x => x.classList.remove("active"));
+  b.classList.add("active");
+});
+$("#st-start").addEventListener("click", () => {
+  $("#story-modal").classList.add("hidden");
+  startSession("story", { story: {
+    topic: $("#st-topic").value.trim(),
+    script: $("#st-script .active")?.dataset.s || "normal",
+  }});
+});
 $("#cr-cancel").addEventListener("click", () => $("#custom-modal").classList.add("hidden"));
 $("#cr-start").addEventListener("click", () => {
   const custom = {

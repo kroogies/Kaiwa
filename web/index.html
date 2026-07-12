@@ -52,6 +52,10 @@
           <svg class="icon mode-icon"><use href="/static/icons.svg#drama"/></svg>
           <h3>Custom Roleplay</h3><p>Invent your own scene — any role, any place.</p>
         </div>
+        <div class="mode-card story" id="card-story">
+          <svg class="icon mode-icon"><use href="/static/icons.svg#book-open"/></svg>
+          <h3>Story Time</h3><p>Read a short story at your level, then answer questions.</p>
+        </div>
       </div>
 
       <h2 class="sect"><svg class="icon sect-icon"><use href="/static/icons.svg#book-marked"/></svg> Guided Lessons</h2>
@@ -238,6 +242,22 @@
     <label>Setting <input id="cr-setting" placeholder="an old sword shop in a Kyoto alley"></label>
     <label>Goal <input id="cr-desc" placeholder="negotiate a price and learn sword words"></label>
     <div class="modal-btns"><button class="btn" id="cr-cancel">Cancel</button><button class="btn primary" id="cr-start">Start scene ➤</button></div>
+  </div>
+</div>
+<!-- Story Time modal -->
+<div id="story-modal" class="modal hidden">
+  <div class="modal-inner">
+    <h2><svg class="icon"><use href="/static/icons.svg#book-open"/></svg> Story Time</h2>
+    <p class="sub">Kaiwa writes a short story at your level — read it, then answer three questions about it.</p>
+    <label>Topic <input id="st-topic" placeholder="leave blank and Kaiwa picks one for you"></label>
+    <label>Script focus</label>
+    <div id="st-script" class="level-row wrap">
+      <button data-s="normal" class="active">Normal</button>
+      <button data-s="hiragana">ひらがな only</button>
+      <button data-s="katakana">カタカナ practice</button>
+      <button data-s="stretch">Kanji stretch</button>
+    </div>
+    <div class="modal-btns"><button class="btn" id="st-cancel">Cancel</button><button class="btn primary" id="st-start">Write my story ➤</button></div>
   </div>
 </div>
 <!-- Summary modal -->

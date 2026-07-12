@@ -27,6 +27,18 @@ LEVEL_GUIDE = {
 }
 
 
+_SCRIPT_RULES = {
+    "hiragana": ("Write the ENTIRE story in hiragana only — no kanji at all "
+                 "(katakana only where a loanword is truly unavoidable)."),
+    "katakana": ("Make the story naturally full of katakana loanwords (foreign food, travel, "
+                 "technology, music…) and write those words in katakana — this is katakana "
+                 "reading practice. The rest stays at the student's level."),
+    "normal": "Use kanji normally, at exactly the student's level.",
+    "stretch": ("Use kanji slightly ABOVE the student's level — common, useful characters "
+                "they should meet next — but keep grammar and vocabulary at their level."),
+}
+
+
 def _time_of_day() -> str:
     h = datetime.now().hour
     if 5 <= h < 11:
@@ -94,6 +106,25 @@ def tutor_system_prompt(profile: dict, mode: str, scenario: dict | None,
             f"- Target vocabulary/grammar to practice: {', '.join(scenario.get('target_vocab', []))}",
             "- Structure: (1) greet and introduce the topic in one short sentence, (2) demonstrate a target phrase with a simple example, (3) ask the student to try using it, (4) practice each target item through short natural exchanges, (5) when everything has been practiced, congratulate them and briefly recap.",
             "- One step at a time. Never dump the whole lesson at once.",
+        ]
+    elif mode == "story" and scenario:
+        script = scenario.get("script", "normal")
+        topic = scenario.get("topic") or ""
+        parts += [
+            "",
+            "STORY TIME MODE — you write reading practice, then quiz on it:",
+            "- EXCEPTION to the short-reply rule: your FIRST message is a complete short story.",
+            "- Do NOT greet. Your first message contains ONLY: the title, the story, and the one-line invitation at the end. The story itself must not begin with a greeting word (no おはよう／こんにちは line).",
+            (f"- Story topic: {topic}" if topic else
+             "- No topic was given: invent a charming topic yourself, ideally connected to the student's interests."),
+            "- Story length by level: N5 ≈ 5-7 short simple sentences; N4 ≈ 7-9; N3 ≈ 9-12; N2/N1 ≈ 12-15 richer sentences.",
+            f"- SCRIPT RULE: {_SCRIPT_RULES.get(script, _SCRIPT_RULES['normal'])}",
+            "- Format of the first message: a short Japanese title on the first line, then the story. No translation, no vocabulary list, no explanations.",
+            "- End the first message with ONE short line inviting the student to say when they finished reading (e.g. 読み終わったら「読んだよ」と言ってね！).",
+            "- AFTER the student replies, quiz them on the story: THREE comprehension questions total, in simple Japanese at the student's level. Questions must be answerable from the story text alone.",
+            "- STRICT: each quiz message contains exactly ONE question — never two questions in the same message. One question, then wait for the answer.",
+            "- After each answer: say in one short sentence whether it was right (model the correct answer naturally if not), then ask the next question in the same message.",
+            "- After the third answer: congratulate briefly, point out 2-3 useful words from the story, and ask if they'd like to talk about the story.",
         ]
     elif mode == "call":
         parts += [
