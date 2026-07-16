@@ -568,6 +568,17 @@ async function showSessionSummary() {
    story itself, each quiz turn becomes the next page. Same /api/chat session
    underneath, so resume, reports, and corrections all keep working. */
 const reader = { pages: [], cur: 0 };
+
+/* Hiragana-only stories: the local model sometimes slips katakana in anyway.
+   Convert it deterministically at render time so beginners never hit kana they
+   can't read yet. Text-node only — data-w attributes keep the original surface
+   so word lookups still work. */
+const storyIsHiragana = () => state.session?.scenario?.script === "hiragana";
+const toHiragana = (s) => s.replace(/[ァ-ヶ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60));
+function hiraganizeEl(el) {
+  const walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  for (let n = walk.nextNode(); n; n = walk.nextNode()) n.nodeValue = toHiragana(n.nodeValue);
+}
 const TYPING = `<span class="typing"><span></span><span></span><span></span></span>`;
 
 function openReader(res) {
@@ -660,6 +671,7 @@ async function readerStream(text, page, correctEl) {
       onError: msg => { body.textContent = "⚠️ " + msg; },
       onDelta: raw => {
         if (!started) { body.textContent = ""; started = true; }
+        if (storyIsHiragana()) raw = toHiragana(raw);   // strip stray katakana live
         if (title) {                     // first line of the story is its title
           const nl = raw.indexOf("\n");
           title.textContent = nl >= 0 ? raw.slice(0, nl).trim() : raw;
@@ -685,6 +697,10 @@ function finishReaderPage(page, ev, raw) {
     }
   }
   body.innerHTML = renderTokens(toks);
+  if (storyIsHiragana()) {               // safety net: convert any katakana the model left in
+    if (isStory) hiraganizeEl($(".story-title", page));
+    hiraganizeEl(body);
+  }
   $(".romaji-line", page).textContent = ev.romaji || "";
 
   const actions = $(".reader-actions", page);
@@ -1163,24 +1179,42 @@ function renderReviewCard() {
 }
 
 /* ================================================================= vocab */
+const VOCAB_PAGE = 8;
 async function loadVocab() {
   const d = await api.get("/api/vocab");
-  $("#vocab-list").innerHTML = d.vocab.length ? d.vocab.map(v => `
+  state.vocab = d.vocab;
+  state.vocabShown = VOCAB_PAGE;
+  renderVocab();
+}
+
+function renderVocab() {
+  const list = state.vocab || [];
+  if (!list.length) {
+    $("#vocab-list").innerHTML = `<p class="sub">No words yet — tap any word in a chat to save it!</p>`;
+    return;
+  }
+  const slice = list.slice(0, state.vocabShown);
+  const more = list.length - slice.length;
+  $("#vocab-list").innerHTML = slice.map(v => `
     <div class="vocab-item" data-id="${v.id}">
       <div><div class="w">${esc(v.word)}</div><div class="r">${esc(v.reading || "")}</div></div>
       <div class="m">${esc(v.meaning || "")}${v.example ? `<div class="ex">${esc(v.example)}</div>` : ""}</div>
       <button class="v-play" title="Listen">${icon("volume-2")}</button>
       <button class="v-del" title="Delete">${icon("trash-2")}</button>
-    </div>`).join("")
-    : `<p class="sub">No words yet — tap any word in a chat to save it!</p>`;
+    </div>`).join("") +
+    (more ? `<button class="btn small show-more" id="vocab-more">Show more (${more})</button>` : "");
   $$(".vocab-item").forEach(item => {
     const id = item.dataset.id;
     const word = $(".w", item).textContent;
     $(".v-play", item).addEventListener("click", () => playTTS(word, 1.0));
     $(".v-del", item).addEventListener("click", async () => {
-      await api.del(`/api/vocab/${id}`); item.remove(); refreshDueBadge();
+      await api.del(`/api/vocab/${id}`);
+      state.vocab = state.vocab.filter(x => String(x.id) !== String(id));
+      renderVocab(); refreshDueBadge();
     });
   });
+  const moreBtn = $("#vocab-more");
+  if (moreBtn) moreBtn.addEventListener("click", () => { state.vocabShown += VOCAB_PAGE; renderVocab(); });
 }
 
 /* ============================================================== progress */
@@ -1192,7 +1226,25 @@ async function loadProgress() {
     stat(d.sessions_count, "sessions") + stat(d.messages_spoken, "things you said") +
     stat(d.words_saved, "words saved") + stat(d.mistakes_logged, "mistakes caught");
   state.recentSessions = d.recent_sessions;
-  $("#recent-sessions").innerHTML = d.recent_sessions.length ? d.recent_sessions.map((s, i) => `
+  state.sessShown = SESS_PAGE;
+  renderRecentSessions();
+  const max = Math.max(1, ...d.mistake_categories.map(c => c.n));
+  $("#mistake-cats").innerHTML = d.mistake_categories.length ? d.mistake_categories.map(c => `
+    <div class="mcat"><span class="lbl">${esc(c.category || "other")}</span>
+    <div class="bar" style="width:${(c.n / max) * 260}px"></div><span class="n">${c.n}</span></div>`).join("")
+    : `<p class="sub">No mistakes logged yet. (That's either very good or very quiet.)</p>`;
+}
+
+const SESS_PAGE = 8;
+function renderRecentSessions() {
+  const list = state.recentSessions || [];
+  if (!list.length) {
+    $("#recent-sessions").innerHTML = `<p class="sub">No sessions yet — start one from Home!</p>`;
+    return;
+  }
+  const slice = list.slice(0, state.sessShown);   // slice index == index into state.recentSessions
+  const more = list.length - slice.length;
+  $("#recent-sessions").innerHTML = slice.map((s, i) => `
     <div class="session-item expandable" data-i="${i}">
       <div class="head"><span>${esc(s.title)} <small>(${s.mode.replace("_", " ")})</small></span>
       <span class="when">${new Date(s.started_at * 1000).toLocaleDateString()} · ${s.minutes} min <span class="chev">▾</span></span></div>
@@ -1200,12 +1252,8 @@ async function loadProgress() {
       <div class="sess-detail hidden">${sessionDetailHTML(s)}
         <button class="btn small sess-pdf" data-i="${i}">${icon("clipboard-list")} Save as PDF</button>
       </div>
-    </div>`).join("") : `<p class="sub">No sessions yet — start one from Home!</p>`;
-  const max = Math.max(1, ...d.mistake_categories.map(c => c.n));
-  $("#mistake-cats").innerHTML = d.mistake_categories.length ? d.mistake_categories.map(c => `
-    <div class="mcat"><span class="lbl">${esc(c.category || "other")}</span>
-    <div class="bar" style="width:${(c.n / max) * 260}px"></div><span class="n">${c.n}</span></div>`).join("")
-    : `<p class="sub">No mistakes logged yet. (That's either very good or very quiet.)</p>`;
+    </div>`).join("") +
+    (more ? `<button class="btn small show-more" id="sess-more">Show more (${more})</button>` : "");
 }
 
 function sessionDetailHTML(s) {
@@ -1220,6 +1268,9 @@ function sessionDetailHTML(s) {
 }
 
 $("#recent-sessions").addEventListener("click", e => {
+  if (e.target.closest("#sess-more")) {
+    state.sessShown += SESS_PAGE; renderRecentSessions(); return;
+  }
   const pdfBtn = e.target.closest(".sess-pdf");
   if (pdfBtn) {
     printSessionReport(state.recentSessions[+pdfBtn.dataset.i]);
