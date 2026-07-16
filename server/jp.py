@@ -30,10 +30,49 @@ def is_kana(c: str) -> bool:
     return "぀" <= c <= "ヿ" or c in "ーゝゞヽヾ"
 
 
+# Auxiliaries glue onto the preceding verb/adjective (食べ+まし+た →
+# tabemashita) — except standalone copulas, which stay their own word.
+_VERBISH = ("動詞", "形容詞", "助動詞", "接尾辞")
+_NO_GLUE = ("です", "でしょ", "でしょう", "だ", "だろう")
+_PARTICLE_KANA = {"は": "ワ", "へ": "エ", "を": "オ"}
+
+
 def romaji(text: str) -> str:
+    """Hepburn romaji. Tokenize first — kakasi's own segmentation mis-reads
+    kanji across word boundaries (ご飯食べた → 'go hanshoku beta').
+
+    Kana is accumulated per output word and romanized whole, so sokuon
+    spanning tokens (高かっ+た) still comes out geminated (takakatta).
+    """
     try:
-        items = _kakasi().convert(text)
-        return " ".join(i["hepburn"] for i in items if i["hepburn"].strip())
+        words, prev_pos = [], ""  # words: kana per output word
+        for surface, kana, pos in _tokenize(text):
+            k = kana or surface
+            if pos == "助詞" and surface in _PARTICLE_KANA:
+                k = _PARTICLE_KANA[surface]  # は→wa, へ→e, を→o
+            if not k.strip():
+                prev_pos = pos
+                continue
+            glue = words and (
+                pos in ("補助記号", "記号", "接尾辞")  # punctuation: ね。→ "ne."
+                # single-kanji noun suffixes: 日本+語 → nihongo, アメリカ+人 → amerikajin
+                or (pos == "名詞" and prev_pos == "名詞" and len(surface) == 1)
+                or (prev_pos in _VERBISH
+                    and surface not in _NO_GLUE
+                    and (pos == "助動詞"
+                         or (pos == "助詞" and surface in ("て", "で", "ば", "ちゃ", "じゃ"))))
+            )
+            if glue:
+                words[-1] += k
+            else:
+                words.append(k)
+            prev_pos = pos
+        out = []
+        for w in words:
+            r = "".join(i["hepburn"] for i in _kakasi().convert(w)).strip()
+            if r:
+                out.append(r)
+        return " ".join(out)
     except Exception:
         return ""
 
@@ -64,21 +103,32 @@ def backend_name() -> str:
     return _backend
 
 
+# UniDic defaults that confuse learners: 私 → ワタクシ, 日本 → ニッポン.
+_READING_OVERRIDES = {"私": "ワタシ", "日本": "ニホン"}
+
+
 def _tokenize(text: str):
     """Yield (surface, reading_katakana_or_None, pos)."""
     _init_backend()
     if _backend == "fugashi":
+        prev_pos2 = ""
         for w in _tagger(text):
-            kana = None
-            try:
-                kana = w.feature.kana or w.feature.pron  # unidic: kana reading
-            except Exception:
-                pass
+            kana = _READING_OVERRIDES.get(w.surface)
+            pos2 = str(getattr(w.feature, "pos2", "") or "")
+            if not kana and w.surface == "人" and prev_pos2 == "固有名詞":
+                kana = "ジン"  # unidic-lite says ニン even for 日本人/アメリカ人
+            if not kana:
+                try:
+                    kana = w.feature.kana or w.feature.pron  # unidic: kana reading
+                except Exception:
+                    pass
             pos = w.feature.pos1 if hasattr(w.feature, "pos1") else ""
+            prev_pos2 = pos2
             yield w.surface, kana, str(pos or "")
     else:
         for t in _janome.tokenize(text):
             kana = t.reading if t.reading != "*" else None
+            kana = _READING_OVERRIDES.get(t.surface, kana)
             pos = t.part_of_speech.split(",")[0]
             yield t.surface, kana, pos
 
@@ -129,7 +179,21 @@ def annotate(text: str) -> list:
 
     Returns list of tokens:
       {"surface": str, "ruby": [{"t","r"}], "reading": hira, "pos": str, "word": bool}
+
+    Newlines survive as their own non-word tokens (stories are multi-line;
+    the tokenizer would otherwise swallow them).
     """
+    out = []
+    lines = text.split("\n")
+    for i, line in enumerate(lines):
+        if i:
+            out.append({"surface": "\n", "ruby": [{"t": "\n", "r": None}],
+                        "reading": None, "pos": "空白", "word": False})
+        out.extend(_annotate_line(line))
+    return out
+
+
+def _annotate_line(text: str) -> list:
     out = []
     for surface, kana, pos in _tokenize(text):
         if not surface:
@@ -150,6 +214,18 @@ def annotate(text: str) -> list:
             "word": is_word,
         })
     return out
+
+
+def kanji_to_kana(text: str) -> str:
+    """Rewrite kanji words as their hiragana readings (hiragana-only script mode —
+    small local models can't be trusted to obey 'no kanji' on their own)."""
+    out = []
+    for surface, kana, pos in _tokenize(text):
+        if has_kanji(surface) and kana:
+            out.append(kata_to_hira(kana))
+        else:
+            out.append(surface)
+    return "".join(out)
 
 
 def lemma_of(word: str) -> str | None:

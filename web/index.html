@@ -52,6 +52,10 @@
           <svg class="icon mode-icon"><use href="/static/icons.svg#drama"/></svg>
           <h3>Custom Roleplay</h3><p>Invent your own scene — any role, any place.</p>
         </div>
+        <div class="mode-card story" id="card-story">
+          <svg class="icon mode-icon"><use href="/static/icons.svg#book-open"/></svg>
+          <h3>Story Time</h3><p>Read a short story at your level, then answer questions.</p>
+        </div>
       </div>
 
       <h2 class="sect"><svg class="icon sect-icon"><use href="/static/icons.svg#book-marked"/></svg> Guided Lessons</h2>
@@ -79,6 +83,25 @@
         <button id="mic-btn" class="icon-btn big mic" title="Click to speak"><svg class="icon"><use href="/static/icons.svg#mic"/></svg></button>
         <input id="chat-input" type="text" placeholder="Type in Japanese (or English)…" autocomplete="off">
         <button id="send-btn" class="icon-btn big send" title="Send"><svg class="icon"><use href="/static/icons.svg#send-horizontal"/></svg></button>
+      </footer>
+    </section>
+
+    <!-- STORY READER (story mode gets a book-like page, not chat bubbles) -->
+    <section id="view-reader" class="view hidden">
+      <header class="chat-head">
+        <button id="reader-back" class="icon-btn" title="Back"><svg class="icon"><use href="/static/icons.svg#arrow-left"/></svg></button>
+        <div class="chat-title"><h2 id="reader-title">Story Time</h2><small id="reader-sub"></small></div>
+        <div class="chat-tools">
+          <label class="mini-toggle"><input type="checkbox" id="rd-furigana" checked><span>ふりがな</span></label>
+          <label class="mini-toggle"><input type="checkbox" id="rd-romaji"><span>romaji</span></label>
+          <button id="reader-end" class="btn danger small">End &amp; Review</button>
+        </div>
+      </header>
+      <div id="reader-pages"></div>
+      <footer id="reader-nav" class="reader-nav hidden">
+        <button id="rd-prev" class="icon-btn big" title="Previous page"><svg class="icon"><use href="/static/icons.svg#arrow-left"/></svg></button>
+        <div id="rd-dots" class="rd-dots"></div>
+        <button id="rd-next" class="icon-btn big" title="Next page"><svg class="icon flip-x"><use href="/static/icons.svg#arrow-left"/></svg></button>
       </footer>
     </section>
 
@@ -143,6 +166,10 @@
             </div>
           </label>
           <label>Speech speed <input id="set-speed" type="range" min="0.6" max="1.4" step="0.1"> <span id="speed-val"></span></label>
+          <label>Expressiveness <input id="set-intonation" type="range" min="0.5" max="2" step="0.1"> <span id="intonation-val"></span></label>
+          <p class="sub" id="aivis-hint">Want more emotional, anime-style voices? Install
+            <a href="https://aivis-project.com/" target="_blank" rel="noopener">AivisSpeech</a>, add voices from AivisHub,
+            and keep it running — Kaiwa detects it automatically and lists its voices above.</p>
           <label class="row"><input type="checkbox" id="set-autoplay"> Auto-play tutor voice</label>
           <label class="row"><input type="checkbox" id="set-autotranslate"> Auto-translate tutor messages</label>
           <button id="save-settings" class="btn primary">Save</button>
@@ -174,10 +201,9 @@
         <div class="card">
           <h3><svg class="icon"><use href="/static/icons.svg#heart"/></svg> Community</h3>
           <p class="sub" style="margin-bottom:12px">Follow Kaiwa for updates, tips, and new scenarios.</p>
-          <!-- TODO: replace placeholder URLs before release -->
           <div class="link-list">
-            <a class="ext-link" href="https://facebook.com/kaiwa-app" target="_blank" rel="noopener"><svg class="icon"><use href="/static/icons.svg#users"/></svg> Facebook page</a>
-            <a class="ext-link" href="https://kaiwa.app" target="_blank" rel="noopener"><svg class="icon"><use href="/static/icons.svg#link"/></svg> Website</a>
+            <a class="ext-link" href="https://kroogies.github.io/Kaiwa" target="_blank" rel="noopener"><svg class="icon"><use href="/static/icons.svg#link"/></svg> Website</a>
+            <a class="ext-link" href="https://github.com/kroogies/Kaiwa" target="_blank" rel="noopener"><svg class="icon"><use href="/static/icons.svg#users"/></svg> GitHub — report bugs, request features</a>
           </div>
         </div>
       </div>
@@ -208,6 +234,23 @@
 
 <!-- Word popup -->
 <div id="word-pop" class="popup hidden"><div class="popup-inner" id="word-pop-inner"></div></div>
+<!-- Resume-session pill: an active chat survives tab switches -->
+<button id="resume-pill" class="resume-pill hidden">
+  <svg class="icon"><use href="/static/icons.svg#message-circle"/></svg>
+  <span id="resume-title">Back to session</span>
+</button>
+<!-- Switch-session confirm modal -->
+<div id="switch-modal" class="modal hidden">
+  <div class="modal-inner">
+    <h2><svg class="icon"><use href="/static/icons.svg#messages-square"/></svg> Finish current session?</h2>
+    <p class="sub">You're still in &ldquo;<span id="switch-title"></span>&rdquo;. Get your session report before starting the new one?</p>
+    <div class="modal-btns">
+      <button class="btn" id="switch-cancel">Keep talking</button>
+      <button class="btn" id="switch-skip">Start new</button>
+      <button class="btn primary" id="switch-report">Report &amp; finish</button>
+    </div>
+  </div>
+</div>
 <!-- Custom roleplay modal -->
 <div id="custom-modal" class="modal hidden">
   <div class="modal-inner">
@@ -218,6 +261,22 @@
     <label>Setting <input id="cr-setting" placeholder="an old sword shop in a Kyoto alley"></label>
     <label>Goal <input id="cr-desc" placeholder="negotiate a price and learn sword words"></label>
     <div class="modal-btns"><button class="btn" id="cr-cancel">Cancel</button><button class="btn primary" id="cr-start">Start scene ➤</button></div>
+  </div>
+</div>
+<!-- Story Time modal -->
+<div id="story-modal" class="modal hidden">
+  <div class="modal-inner">
+    <h2><svg class="icon"><use href="/static/icons.svg#book-open"/></svg> Story Time</h2>
+    <p class="sub">Kaiwa writes a short story at your level — read it, then answer three questions about it.</p>
+    <label>Topic <input id="st-topic" placeholder="leave blank and Kaiwa picks one for you"></label>
+    <label>Script focus</label>
+    <div id="st-script" class="level-row wrap">
+      <button data-s="normal" class="active">Normal</button>
+      <button data-s="hiragana">ひらがな only</button>
+      <button data-s="katakana">カタカナ practice</button>
+      <button data-s="stretch">Kanji stretch</button>
+    </div>
+    <div class="modal-btns"><button class="btn" id="st-cancel">Cancel</button><button class="btn primary" id="st-start">Write my story ➤</button></div>
   </div>
 </div>
 <!-- Summary modal -->
