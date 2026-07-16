@@ -73,6 +73,7 @@ def health():
         "models": llm.list_models(),
         "whisper": stt.available(),
         "voicevox": tts.voicevox_up(),
+        "aivis": tts.engine_up("aivis"),
         "tokenizer": jp.backend_name(),
         "dictionary": dictionary.available(),
     }
@@ -148,6 +149,7 @@ def get_profile():
     s.setdefault("provider", "ollama")
     s.setdefault("voice", tts.default_voice())
     s.setdefault("speed", 1.0)
+    s.setdefault("intonation", 1.0)
     s.setdefault("auto_play", True)
     s.setdefault("furigana", True)
     s.setdefault("romaji", False)
@@ -202,6 +204,16 @@ async def create_session(req: Request):
                 "setting": c.get("setting", ""), "target_vocab": [], "kind": "roleplay",
             }
             sid_key = "custom"
+    elif mode == "story":
+        s = body.get("story") or {}
+        topic = (s.get("topic") or "").strip()
+        scen = {
+            "id": "story", "kind": "story",
+            "title": topic or "Story Time 📖",
+            "description": "Reading practice: a short story, then three questions.",
+            "topic": topic, "script": s.get("script", "normal"),
+        }
+        sid_key = "story"
     session_id = db.create_session(mode, sid_key, scen)
     return {"session_id": session_id, "scenario": scen}
 
@@ -247,9 +259,12 @@ async def chat(req: Request):
 
     messages = [{"role": "system", "content": system}] + _history(sid)
     if not text and not db.get_messages(sid):
-        messages.append({"role": "user", "content":
-                         "(Begin now: greet me / open the scene with your first line. "
-                         "Do not mention this instruction.)"})
+        opener = ("(Begin now: write the story — Japanese title on the first line, then the story, "
+                  "then the one-line invitation. NO greeting. Do not mention this instruction.)"
+                  if session["mode"] == "story" else
+                  "(Begin now: greet me / open the scene with your first line. "
+                  "Do not mention this instruction.)")
+        messages.append({"role": "user", "content": opener})
 
     def gen():
         yield f"data: {json.dumps({'user_message_id': user_msg_id})}\n\n"
@@ -262,6 +277,11 @@ async def chat(req: Request):
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
             return
         reply = "".join(full).strip()
+        # hiragana-only stories: enforce the script deterministically — the 4B
+        # model ignores "no kanji" instructions more often than not
+        scen = session.get("scenario") or {}
+        if session["mode"] == "story" and scen.get("script") == "hiragana":
+            reply = jp.kanji_to_kana(reply)
         mid = db.add_message(sid, "assistant", reply)
         final = {
             "done": True, "message_id": mid,
@@ -349,7 +369,7 @@ async def word(req: Request):
     info = jp.word_info(w)
 
     # 1) JMdict: instant + accurate. Try surface form, then dictionary form.
-    entry = dictionary.lookup(w)
+    entry = dictionary.lookup(w, info["reading"])
     lemma = jp.lemma_of(w)
     conjugated = False
     if not entry and lemma and lemma != w:
@@ -482,10 +502,11 @@ async def api_stt(audio: UploadFile = File(...)):
 
 
 @app.get("/api/tts")
-def api_tts(text: str, voice: str = "", speed: float = 1.0):
+def api_tts(text: str, voice: str = "", speed: float = 1.0, intonation: float | None = None):
     v = voice or setting("voice") or tts.default_voice()
+    into = intonation if intonation is not None else float(setting("intonation") or 1.0)
     try:
-        wav = tts.synthesize(text, v, speed)
+        wav = tts.synthesize(text, v, speed, into)
     except Exception:
         wav = tts.synthesize(text, "say:Kyoko", speed)  # engine fallback
     if not wav:
@@ -501,9 +522,37 @@ def vocab_list():
     return {"vocab": db.list_vocab()}
 
 
+def _root_form(b: dict) -> dict:
+    """Store dictionary forms, not conjugations/particles (食べました → 食べる).
+
+    Only swaps when JMdict confirms the lemma, so we never trade a real word
+    for a bad tokenizer guess.
+    """
+    w = (b.get("word") or "").strip()
+    b = {**b, "word": w}
+    if not w or dictionary.lookup(w):  # already a dictionary form
+        return b
+    # Conjugated verbs/adjectives want the lemma (食べました → 食べる); anything
+    # else wants the first-token surface, which keeps the user's orthography
+    # while shedding trailing particles (ご飯を → ご飯, not the lemma's 御飯).
+    toks = jp.annotate(w)
+    first = toks[0]["surface"] if toks else ""
+    cands = (jp.lemma_of(w), first) if toks and toks[0]["pos"] in ("動詞", "形容詞") \
+        else (first, jp.lemma_of(w))
+    for cand in cands:
+        if not cand or cand == w:
+            continue
+        info = jp.word_info(cand)
+        entry = dictionary.lookup(cand, info["reading"])
+        if entry:
+            return {**b, "word": cand, "reading": entry["reading"] or info["reading"],
+                    "romaji": info["romaji"], "meaning": entry["meaning"]}
+    return b
+
+
 @app.post("/api/vocab")
 async def vocab_add(req: Request):
-    b = await req.json()
+    b = _root_form(await req.json())
     row = db.add_vocab(b["word"], b.get("reading", ""), b.get("romaji", ""),
                        b.get("meaning", ""), b.get("example", ""), b.get("example_en", ""))
     return row

@@ -47,8 +47,45 @@ function show(view) {
   if (view === "dict") $("#dict-search").focus();
   if (view === "progress") loadProgress();
   if (view === "settings") loadSettings();
+  updateResumePill(view);
 }
 $$(".nav-btn").forEach(b => b.addEventListener("click", () => show(b.dataset.view)));
+
+/* an active chat isn't lost when you switch tabs — tap the pill to get back */
+const sessionView = () =>            // story sessions live in the reader, not chat
+  state.session && state.session.mode === "story" ? "reader" : "chat";
+const sessionTitle = () =>
+  (state.session && state.session.scenario && state.session.scenario.title) ||
+  $("#chat-title").textContent;
+function updateResumePill(view) {
+  const active = state.session && state.session.mode !== "call";
+  $("#resume-pill").classList.toggle("hidden", !(active && view !== sessionView()));
+  if (active) $("#resume-title").textContent = sessionTitle();
+}
+$("#resume-pill").addEventListener("click", () => show(sessionView()));
+
+/* starting a new session over an active one asks first (report / discard / stay) */
+let pendingStart = null;
+function guardActiveSession(startFn) {
+  pendingStart = startFn;
+  $("#switch-title").textContent = sessionTitle();
+  $("#switch-modal").classList.remove("hidden");
+}
+$("#switch-cancel").addEventListener("click", () => {
+  pendingStart = null;
+  $("#switch-modal").classList.add("hidden");
+  show(sessionView());
+});
+$("#switch-skip").addEventListener("click", () => {
+  $("#switch-modal").classList.add("hidden");
+  state.session = null;
+  const go = pendingStart; pendingStart = null;
+  if (go) go();
+});
+$("#switch-report").addEventListener("click", () => {
+  $("#switch-modal").classList.add("hidden");
+  showSessionSummary();       // pendingStart continues after "Done ✓"
+});
 
 /* =============================================================== startup */
 async function boot() {
@@ -71,7 +108,7 @@ async function updateHealth() {
     $("#health").innerHTML =
       `${dot(h.llm_ready)} LLM ${llmLabel}<br>` +
       `${dot(h.whisper)} whisper (voice in)<br>` +
-      `${dot(h.voicevox)} ${h.voicevox ? "VOICEVOX" : "macOS voice"} (voice out)`;
+      `${dot(h.voicevox || h.aivis)} ${[h.aivis && "Aivis", h.voicevox && "VOICEVOX"].filter(Boolean).join(" + ") || "macOS voice"} (voice out)`;
   } catch { $("#health").innerHTML = `<span class="bad">●</span> server offline`; }
 }
 
@@ -262,6 +299,20 @@ function scenCard(s) {
 
 $("#card-free").addEventListener("click", () => startSession("free_chat", {}));
 $("#card-custom").addEventListener("click", () => $("#custom-modal").classList.remove("hidden"));
+$("#card-story").addEventListener("click", () => $("#story-modal").classList.remove("hidden"));
+$("#st-cancel").addEventListener("click", () => $("#story-modal").classList.add("hidden"));
+$("#st-script").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  $$("#st-script button").forEach(x => x.classList.remove("active"));
+  b.classList.add("active");
+});
+$("#st-start").addEventListener("click", () => {
+  $("#story-modal").classList.add("hidden");
+  startSession("story", { story: {
+    topic: $("#st-topic").value.trim(),
+    script: $("#st-script .active")?.dataset.s || "normal",
+  }});
+});
 $("#cr-cancel").addEventListener("click", () => $("#custom-modal").classList.add("hidden"));
 $("#cr-start").addEventListener("click", () => {
   const custom = {
@@ -275,8 +326,10 @@ $("#cr-start").addEventListener("click", () => {
 
 /* ================================================================== chat */
 async function startSession(mode, opts) {
+  if (state.session) return guardActiveSession(() => startSession(mode, opts));
   const res = await api.post("/api/sessions", { mode, ...opts });
   state.session = { ...res, mode };
+  if (mode === "story") return openReader(res);   // stories get the book UI
   const scen = res.scenario;
   $("#chat-title").textContent = scen ? `${scen.title}` : "Free Chat 💬";
   $("#chat-sub").textContent = scen ? (scen.setting || scen.description || "") : "Talk about anything!";
@@ -316,6 +369,34 @@ function renderTokens(tokens) {
 }
 const esc = s => s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
+/* shared SSE pump for /api/chat — chat bubbles and the story reader both use it */
+async function streamChat(text, h) {
+  const resp = await fetch("/api/chat", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ session_id: state.session.session_id, text }),
+  });
+  if (!resp.ok) throw new Error((await resp.json()).error || resp.statusText);
+  const reader = resp.body.getReader();
+  const dec = new TextDecoder();
+  let buf = "", raw = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    let idx;
+    while ((idx = buf.indexOf("\n\n")) >= 0) {
+      const line = buf.slice(0, idx).trim();
+      buf = buf.slice(idx + 2);
+      if (!line.startsWith("data: ")) continue;
+      const ev = JSON.parse(line.slice(6));
+      if (ev.user_message_id && h.onUser) h.onUser(ev.user_message_id);
+      if (ev.error) { h.onError(ev.error); return; }
+      if (ev.delta) { raw += ev.delta; h.onDelta(raw); }
+      if (ev.done) h.onDone(ev, raw);
+    }
+  }
+}
+
 async function sendChat(text) {
   if (state.busy || !state.session) return;
   state.busy = true;
@@ -332,37 +413,18 @@ async function sendChat(text) {
   bubble.innerHTML = `<span class="typing"><span></span><span></span><span></span></span>`;
   scrollDown();
 
+  let started = false;
   try {
-    const resp = await fetch("/api/chat", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ session_id: state.session.session_id, text }),
+    await streamChat(text, {
+      onUser: mid => { if (userDiv) queueCorrection(mid, userDiv); },
+      onError: msg => { bubble.textContent = "⚠️ " + msg; },
+      onDelta: raw => {
+        if (!started) { bubble.textContent = ""; started = true; }
+        bubble.textContent = raw;
+        scrollDown();
+      },
+      onDone: (ev, raw) => finishAiMessage(aiDiv, ev, raw),
     });
-    if (!resp.ok) throw new Error((await resp.json()).error || resp.statusText);
-    const reader = resp.body.getReader();
-    const dec = new TextDecoder();
-    let buf = "", raw = "", started = false;
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += dec.decode(value, { stream: true });
-      let idx;
-      while ((idx = buf.indexOf("\n\n")) >= 0) {
-        const line = buf.slice(0, idx).trim();
-        buf = buf.slice(idx + 2);
-        if (!line.startsWith("data: ")) continue;
-        const ev = JSON.parse(line.slice(6));
-        if (ev.user_message_id && userDiv) queueCorrection(ev.user_message_id, userDiv);
-        if (ev.error) { bubble.textContent = "⚠️ " + ev.error; break; }
-        if (ev.delta) {
-          raw += ev.delta;
-          if (!started) { bubble.textContent = ""; started = true; }
-          bubble.textContent = raw;
-          scrollDown();
-        }
-        if (ev.done) finishAiMessage(aiDiv, ev, raw);
-      }
-    }
   } catch (e) {
     bubble.textContent = "⚠️ " + e.message;
   }
@@ -439,13 +501,16 @@ async function queueCorrection(mid, userDiv) {
 $("#hint-btn").addEventListener("click", async () => {
   if (!state.session) return;
   const h = $("#hints");
+  if (!h.classList.contains("hidden")) { h.classList.add("hidden"); return; }  // toggle off
   h.classList.remove("hidden");
   h.innerHTML = `<div class="hint-card">${icon("lightbulb")} thinking…</div>`;
   const r = await api.post("/api/hint", { session_id: state.session.session_id });
-  h.innerHTML = (r.suggestions || []).map(s =>
+  h.innerHTML = ((r.suggestions || []).map(s =>
     `<div class="hint-card" data-t="${esc(s.japanese)}">${esc(s.japanese)}` +
     `<span class="en">${esc(s.romaji || "")} — ${esc(s.english || "")}</span></div>`).join("")
-    || `<div class="hint-card">Couldn't think of hints, sorry!</div>`;
+    || `<div class="hint-card">Couldn't think of hints, sorry!</div>`) +
+    `<button class="hint-close" title="Close hints">${icon("x")}</button>`;
+  $(".hint-close", h).addEventListener("click", () => h.classList.add("hidden"));
   $$(".hint-card", h).forEach(c => c.addEventListener("click", () => {
     if (c.dataset.t) { $("#chat-input").value = c.dataset.t; h.classList.add("hidden"); $("#chat-input").focus(); }
   }));
@@ -493,8 +558,198 @@ async function showSessionSummary() {
   $("#sum-close").addEventListener("click", () => {
     $("#summary-modal").classList.add("hidden");
     state.session = null;
-    show("home");
+    const go = pendingStart; pendingStart = null;
+    if (go) go(); else show("home");
   });
+}
+
+/* ========================================================== story reader */
+/* Story mode renders as book pages instead of chat bubbles: page 1 is the
+   story itself, each quiz turn becomes the next page. Same /api/chat session
+   underneath, so resume, reports, and corrections all keep working. */
+const reader = { pages: [], cur: 0 };
+
+/* Hiragana-only stories: the local model sometimes slips katakana in anyway.
+   Convert it deterministically at render time so beginners never hit kana they
+   can't read yet. Text-node only — data-w attributes keep the original surface
+   so word lookups still work. */
+const storyIsHiragana = () => state.session?.scenario?.script === "hiragana";
+const toHiragana = (s) => s.replace(/[ァ-ヶ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60));
+function hiraganizeEl(el) {
+  const walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  for (let n = walk.nextNode(); n; n = walk.nextNode()) n.nodeValue = toHiragana(n.nodeValue);
+}
+const TYPING = `<span class="typing"><span></span><span></span><span></span></span>`;
+
+function openReader(res) {
+  const scen = res.scenario || {};
+  $("#reader-title").textContent = scen.title || "Story Time";
+  $("#reader-sub").textContent =
+    ({ hiragana: "ひらがな only", katakana: "カタカナ practice", stretch: "kanji stretch" })[scen.script] || "";
+  reader.pages = []; reader.cur = 0;
+  $("#reader-pages").innerHTML = "";
+  $("#reader-nav").classList.add("hidden");
+  $("#rd-furigana").checked = state.settings.furigana !== false;
+  $("#rd-romaji").checked = !!state.settings.romaji;
+  applyReaderToggles();
+  show("reader");
+  readerStream("", addReaderPage("story"));   // AI opens by writing the story
+}
+
+$("#reader-back").addEventListener("click", () => show("home"));
+$("#reader-end").addEventListener("click", showSessionSummary);
+$("#rd-prev").addEventListener("click", () => readerGo(reader.cur - 1));
+$("#rd-next").addEventListener("click", () => readerGo(reader.cur + 1));
+$("#rd-furigana").addEventListener("change", applyReaderToggles);
+$("#rd-romaji").addEventListener("change", applyReaderToggles);
+function applyReaderToggles() {
+  $("#reader-pages").classList.toggle("no-furigana", !$("#rd-furigana").checked);
+  $("#reader-pages").classList.toggle("show-romaji", $("#rd-romaji").checked);
+}
+
+function addReaderPage(type) {
+  const div = document.createElement("div");
+  div.className = `reader-page ${type}`;
+  if (type === "story") {
+    div.innerHTML = `
+      <h2 class="story-title"></h2>
+      <div class="story-body">${TYPING}</div>
+      <div class="romaji-line"></div><div class="trans-line hidden"></div>
+      <div class="msg-actions reader-actions"></div>
+      <div class="reader-cta hidden"><button class="btn primary">Start the quiz ➤</button></div>`;
+  } else {
+    // story is page 0; quiz pages 1-3 are the questions, 4 is the wrap-up
+    const n = reader.pages.length;
+    const label = n <= 3 ? `Question ${n} <span class="of">/ 3</span>`
+      : n === 4 ? `${icon("party-popper")} Story complete!`
+      : `${icon("message-circle")} Chat`;
+    div.innerHTML = `
+      <div class="quiz-label">${label}</div>
+      <div class="quiz-body">${TYPING}</div>
+      <div class="romaji-line"></div><div class="trans-line hidden"></div>
+      <div class="msg-actions reader-actions"></div>
+      <div class="quiz-after"></div>
+      <div class="quiz-answer hidden">
+        <input type="text" placeholder="${n <= 3 ? "Answer in Japanese…" : "Reply…"}" autocomplete="off">
+        <button class="icon-btn big send" title="Send">${icon("send-horizontal")}</button>
+      </div>`;
+  }
+  $("#reader-pages").appendChild(div);
+  reader.pages.push(div);
+  readerGo(reader.pages.length - 1);
+  return div;
+}
+
+function readerGo(i) {
+  reader.cur = Math.max(0, Math.min(i, reader.pages.length - 1));
+  reader.pages.forEach((p, j) => p.classList.toggle("hidden", j !== reader.cur));
+  $("#reader-pages").scrollTop = 0;
+  updateReaderNav();
+}
+
+function updateReaderNav() {
+  const dots = $("#rd-dots");
+  dots.innerHTML = reader.pages.map((p, j) =>
+    `<button class="rd-dot ${j === reader.cur ? "on" : ""}" data-i="${j}" ` +
+    `title="${j === 0 ? "Story" : "Page " + (j + 1)}">${j === 0 ? icon("book-open") : j}</button>`).join("");
+  $$(".rd-dot", dots).forEach(b => b.addEventListener("click", () => readerGo(+b.dataset.i)));
+  $("#rd-prev").disabled = reader.cur === 0;
+  $("#rd-next").disabled = reader.cur >= reader.pages.length - 1;
+  $("#reader-nav").classList.toggle("hidden", reader.pages.length < 2);
+}
+
+async function readerStream(text, page, correctEl) {
+  if (!state.session) return;
+  state.busy = true;
+  const isStory = page.classList.contains("story");
+  const body = $(isStory ? ".story-body" : ".quiz-body", page);
+  const title = isStory ? $(".story-title", page) : null;
+  let started = false;
+  try {
+    await streamChat(text, {
+      onUser: mid => { if (correctEl) queueCorrection(mid, correctEl); },
+      onError: msg => { body.textContent = "⚠️ " + msg; },
+      onDelta: raw => {
+        if (!started) { body.textContent = ""; started = true; }
+        if (storyIsHiragana()) raw = toHiragana(raw);   // strip stray katakana live
+        if (title) {                     // first line of the story is its title
+          const nl = raw.indexOf("\n");
+          title.textContent = nl >= 0 ? raw.slice(0, nl).trim() : raw;
+          body.textContent = nl >= 0 ? raw.slice(nl + 1).replace(/^\n+/, "") : "";
+        } else body.textContent = raw;
+      },
+      onDone: (ev, raw) => finishReaderPage(page, ev, raw),
+    });
+  } catch (e) { body.textContent = "⚠️ " + e.message; }
+  state.busy = false;
+}
+
+function finishReaderPage(page, ev, raw) {
+  const isStory = page.classList.contains("story");
+  const body = $(isStory ? ".story-body" : ".quiz-body", page);
+  let toks = ev.tokens || [];
+  if (isStory) {
+    const nl = toks.findIndex(t => t.surface === "\n");
+    if (nl > 0) {
+      $(".story-title", page).innerHTML = renderTokens(toks.slice(0, nl));
+      toks = toks.slice(nl + 1);
+      while (toks.length && toks[0].surface === "\n") toks.shift();
+    }
+  }
+  body.innerHTML = renderTokens(toks);
+  if (storyIsHiragana()) {               // safety net: convert any katakana the model left in
+    if (isStory) hiraganizeEl($(".story-title", page));
+    hiraganizeEl(body);
+  }
+  $(".romaji-line", page).textContent = ev.romaji || "";
+
+  const actions = $(".reader-actions", page);
+  actions.innerHTML = `
+    <button class="act-play" title="Play">${icon("volume-2")} Play</button>
+    <button class="act-slow" title="Play slowly">${icon("turtle")} Slow</button>
+    <button class="act-trans" title="Translate">${icon("languages")} Translate</button>`;
+  $(".act-play", actions).addEventListener("click", () => playTTS(raw, 1.0));
+  $(".act-slow", actions).addEventListener("click", () => playTTS(raw, 0.7));
+  $(".act-trans", actions).addEventListener("click", () => translateMsg(ev.message_id, page));
+  $$(".tok", page).forEach(tok =>
+    tok.addEventListener("click", e => wordPopup(e, tok.dataset.w, raw)));
+
+  if (isStory) {
+    const cta = $(".reader-cta", page);
+    cta.classList.remove("hidden");
+    $("button", cta).addEventListener("click", () => {
+      cta.remove();                             // one story, one quiz
+      readerStream("はい、クイズをおねがいします！", addReaderPage("quiz"));
+    }, { once: true });
+  } else {
+    if (reader.pages.indexOf(page) === 4) {     // wrap-up page: offer the report
+      const after = $(".quiz-after", page);
+      after.innerHTML = `<button class="btn primary rd-finish">${icon("clipboard-list")} Finish &amp; get report</button>`;
+      $(".rd-finish", after).addEventListener("click", showSessionSummary);
+    }
+    wireQuizAnswer(page);
+    if (state.settings.auto_play !== false) playTTS(raw, 1.0);  // hear the question
+  }
+  updateReaderNav();
+}
+
+function wireQuizAnswer(page) {
+  const box = $(".quiz-answer", page);
+  box.classList.remove("hidden");
+  const inp = $("input", box), send = $("button", box);
+  const go = () => {
+    const t = inp.value.trim();
+    if (!t || state.busy) return;
+    box.classList.add("hidden");
+    const chip = document.createElement("div");   // the answer stays on its
+    chip.className = "your-answer";               // question page for review
+    chip.innerHTML = `<span class="ya-label">Your answer</span>${esc(t)}`;
+    $(".quiz-after", page).appendChild(chip);
+    readerStream(t, addReaderPage("quiz"), chip); // corrections land on the chip
+  };
+  send.addEventListener("click", go);
+  inp.addEventListener("keydown", e => { if (e.key === "Enter") go(); });
+  inp.focus();
 }
 
 /* ============================================================ word popup */
@@ -617,6 +872,7 @@ $("#call-cc").addEventListener("click", () => {
 });
 
 async function startCall() {
+  if (state.session) return guardActiveSession(startCall);
   const res = await api.post("/api/sessions", { mode: "call" });
   state.session = { ...res, mode: "call" };
   Object.assign(call, {
@@ -923,24 +1179,42 @@ function renderReviewCard() {
 }
 
 /* ================================================================= vocab */
+const VOCAB_PAGE = 8;
 async function loadVocab() {
   const d = await api.get("/api/vocab");
-  $("#vocab-list").innerHTML = d.vocab.length ? d.vocab.map(v => `
+  state.vocab = d.vocab;
+  state.vocabShown = VOCAB_PAGE;
+  renderVocab();
+}
+
+function renderVocab() {
+  const list = state.vocab || [];
+  if (!list.length) {
+    $("#vocab-list").innerHTML = `<p class="sub">No words yet — tap any word in a chat to save it!</p>`;
+    return;
+  }
+  const slice = list.slice(0, state.vocabShown);
+  const more = list.length - slice.length;
+  $("#vocab-list").innerHTML = slice.map(v => `
     <div class="vocab-item" data-id="${v.id}">
       <div><div class="w">${esc(v.word)}</div><div class="r">${esc(v.reading || "")}</div></div>
       <div class="m">${esc(v.meaning || "")}${v.example ? `<div class="ex">${esc(v.example)}</div>` : ""}</div>
       <button class="v-play" title="Listen">${icon("volume-2")}</button>
       <button class="v-del" title="Delete">${icon("trash-2")}</button>
-    </div>`).join("")
-    : `<p class="sub">No words yet — tap any word in a chat to save it!</p>`;
+    </div>`).join("") +
+    (more ? `<button class="btn small show-more" id="vocab-more">Show more (${more})</button>` : "");
   $$(".vocab-item").forEach(item => {
     const id = item.dataset.id;
     const word = $(".w", item).textContent;
     $(".v-play", item).addEventListener("click", () => playTTS(word, 1.0));
     $(".v-del", item).addEventListener("click", async () => {
-      await api.del(`/api/vocab/${id}`); item.remove(); refreshDueBadge();
+      await api.del(`/api/vocab/${id}`);
+      state.vocab = state.vocab.filter(x => String(x.id) !== String(id));
+      renderVocab(); refreshDueBadge();
     });
   });
+  const moreBtn = $("#vocab-more");
+  if (moreBtn) moreBtn.addEventListener("click", () => { state.vocabShown += VOCAB_PAGE; renderVocab(); });
 }
 
 /* ============================================================== progress */
@@ -952,7 +1226,25 @@ async function loadProgress() {
     stat(d.sessions_count, "sessions") + stat(d.messages_spoken, "things you said") +
     stat(d.words_saved, "words saved") + stat(d.mistakes_logged, "mistakes caught");
   state.recentSessions = d.recent_sessions;
-  $("#recent-sessions").innerHTML = d.recent_sessions.length ? d.recent_sessions.map((s, i) => `
+  state.sessShown = SESS_PAGE;
+  renderRecentSessions();
+  const max = Math.max(1, ...d.mistake_categories.map(c => c.n));
+  $("#mistake-cats").innerHTML = d.mistake_categories.length ? d.mistake_categories.map(c => `
+    <div class="mcat"><span class="lbl">${esc(c.category || "other")}</span>
+    <div class="bar" style="width:${(c.n / max) * 260}px"></div><span class="n">${c.n}</span></div>`).join("")
+    : `<p class="sub">No mistakes logged yet. (That's either very good or very quiet.)</p>`;
+}
+
+const SESS_PAGE = 8;
+function renderRecentSessions() {
+  const list = state.recentSessions || [];
+  if (!list.length) {
+    $("#recent-sessions").innerHTML = `<p class="sub">No sessions yet — start one from Home!</p>`;
+    return;
+  }
+  const slice = list.slice(0, state.sessShown);   // slice index == index into state.recentSessions
+  const more = list.length - slice.length;
+  $("#recent-sessions").innerHTML = slice.map((s, i) => `
     <div class="session-item expandable" data-i="${i}">
       <div class="head"><span>${esc(s.title)} <small>(${s.mode.replace("_", " ")})</small></span>
       <span class="when">${new Date(s.started_at * 1000).toLocaleDateString()} · ${s.minutes} min <span class="chev">▾</span></span></div>
@@ -960,12 +1252,8 @@ async function loadProgress() {
       <div class="sess-detail hidden">${sessionDetailHTML(s)}
         <button class="btn small sess-pdf" data-i="${i}">${icon("clipboard-list")} Save as PDF</button>
       </div>
-    </div>`).join("") : `<p class="sub">No sessions yet — start one from Home!</p>`;
-  const max = Math.max(1, ...d.mistake_categories.map(c => c.n));
-  $("#mistake-cats").innerHTML = d.mistake_categories.length ? d.mistake_categories.map(c => `
-    <div class="mcat"><span class="lbl">${esc(c.category || "other")}</span>
-    <div class="bar" style="width:${(c.n / max) * 260}px"></div><span class="n">${c.n}</span></div>`).join("")
-    : `<p class="sub">No mistakes logged yet. (That's either very good or very quiet.)</p>`;
+    </div>`).join("") +
+    (more ? `<button class="btn small show-more" id="sess-more">Show more (${more})</button>` : "");
 }
 
 function sessionDetailHTML(s) {
@@ -980,6 +1268,9 @@ function sessionDetailHTML(s) {
 }
 
 $("#recent-sessions").addEventListener("click", e => {
+  if (e.target.closest("#sess-more")) {
+    state.sessShown += SESS_PAGE; renderRecentSessions(); return;
+  }
   const pdfBtn = e.target.closest(".sess-pdf");
   if (pdfBtn) {
     printSessionReport(state.recentSessions[+pdfBtn.dataset.i]);
@@ -1021,9 +1312,12 @@ async function loadSettings() {
   const cur = p.settings.voice || v.default;
   $("#set-voice").innerHTML = v.voices.map(x =>
     `<option value="${x.id}" ${x.id === cur ? "selected" : ""}>${x.label} (${x.engine})</option>`).join("");
+  $("#aivis-hint").classList.toggle("hidden", v.voices.some(x => x.engine === "AivisSpeech"));
 
   $("#set-speed").value = p.settings.speed || 1.0;
   $("#speed-val").textContent = `${$("#set-speed").value}×`;
+  $("#set-intonation").value = p.settings.intonation ?? 1.0;
+  $("#intonation-val").textContent = `${$("#set-intonation").value}×`;
   $("#set-autoplay").checked = p.settings.auto_play !== false;
   $("#set-autotranslate").checked = !!p.settings.auto_translate;
 
@@ -1107,16 +1401,18 @@ function renderProviderUI() {
 $("#set-provider").addEventListener("change", renderProviderUI);
 
 $("#set-speed").addEventListener("input", () => $("#speed-val").textContent = `${$("#set-speed").value}×`);
-/* voice preview: speak a sample with the currently selected (unsaved) voice + speed */
+$("#set-intonation").addEventListener("input", () => $("#intonation-val").textContent = `${$("#set-intonation").value}×`);
+/* voice preview: speak a sample with the currently selected (unsaved) voice + sliders */
 let previewAudio = null;
 $("#voice-preview").addEventListener("click", () => {
   const btn = $("#voice-preview");
   if (previewAudio) { previewAudio.pause(); previewAudio = null; }
   const v = $("#set-voice").value;
   const s = parseFloat($("#set-speed").value) || 1.0;
+  const i = parseFloat($("#set-intonation").value) || 1.0;
   btn.innerHTML = icon("loader", "spin");
   const reset = () => { btn.innerHTML = icon("volume-2"); };
-  previewAudio = new Audio(`/api/tts?text=${encodeURIComponent("こんにちは、カイワです。よろしくお願いします！")}&speed=${s}&voice=${encodeURIComponent(v)}`);
+  previewAudio = new Audio(`/api/tts?text=${encodeURIComponent("こんにちは、カイワです。よろしくお願いします！")}&speed=${s}&intonation=${i}&voice=${encodeURIComponent(v)}`);
   previewAudio.addEventListener("playing", reset);
   previewAudio.addEventListener("error", reset);
   previewAudio.play().catch(reset);
@@ -1138,6 +1434,7 @@ $("#save-settings").addEventListener("click", async () => {
     provider: prov,
     voice: $("#set-voice").value,
     speed: parseFloat($("#set-speed").value),
+    intonation: parseFloat($("#set-intonation").value),
     auto_play: $("#set-autoplay").checked,
     auto_translate: $("#set-autotranslate").checked,
     furigana: $("#tgl-furigana").checked,
