@@ -1,0 +1,40 @@
+# AppVeyor — builds the Windows .exe installer for Kaiwa (free for public repos).
+# The macOS .dmg is built separately; this pipeline only owns the Windows side.
+# Reuses packaging/kaiwa.spec (PyInstaller) and packaging/kaiwa.iss (Inno Setup).
+
+version: 0.2.0-beta.{build}
+image: Visual Studio 2022
+clone_depth: 1
+
+# No MSBuild/solution — this is a Python build.
+build: off
+
+install:
+  - cmd: C:\Python311-x64\python.exe -m pip install --upgrade pip
+  - cmd: C:\Python311-x64\python.exe -m pip install -r requirements.txt pyinstaller pillow
+
+build_script:
+  - ps: |
+      $py = "C:\Python311-x64\python.exe"
+      # App icon from the PNG.
+      & $py -c "from PIL import Image; im=Image.open('web/icon-512.png').convert('RGBA'); im.save('packaging/kaiwa.ico', sizes=[(256,256),(128,128),(64,64),(48,48),(32,32),(16,16)])"
+      if ($LASTEXITCODE -ne 0) { throw "icon generation failed" }
+      # Freeze the app (onedir) with PyInstaller.
+      & $py -m PyInstaller packaging/kaiwa.spec --noconfirm
+      if ($LASTEXITCODE -ne 0) { throw "pyinstaller failed" }
+      # Version label: from a git tag (v1.2.3 -> 1.2.3), else the build number.
+      if ($env:APPVEYOR_REPO_TAG_NAME) {
+        $env:KAIWA_VERSION = $env:APPVEYOR_REPO_TAG_NAME -replace '^v',''
+      } else {
+        $env:KAIWA_VERSION = "0.2.0-beta.$env:APPVEYOR_BUILD_NUMBER"
+      }
+      # Wrap into a per-user installer with Inno Setup (preinstalled on the image).
+      & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" packaging\kaiwa.iss
+      if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed" }
+
+artifacts:
+  - path: dist_installer\Kaiwa-Setup.exe
+    name: Kaiwa-Setup
+
+# No automatic deploy yet — the .exe is downloadable from the AppVeyor build,
+# then attached to the GitHub release alongside the macOS .dmg.
