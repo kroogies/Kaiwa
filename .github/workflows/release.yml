@@ -1,0 +1,96 @@
+name: Build installers
+
+# Manual runs (workflow_dispatch) build + upload artifacts for debugging without
+# publishing anything. Pushing a version tag (v*) additionally creates a DRAFT
+# GitHub Release with both installers attached, for you to review then publish.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version label for a manual build"
+        required: false
+        default: "0.0.0-dev"
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  macos:
+    runs-on: macos-13   # Intel (x64) runner — matches Kaiwa's documented target
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+      - name: Generate .icns icon
+        run: |
+          set -e
+          mkdir -p packaging/kaiwa.iconset
+          sips -z 512 512 web/icon-512.png --out packaging/kaiwa.iconset/icon_512x512.png
+          sips -z 256 256 web/icon-512.png --out packaging/kaiwa.iconset/icon_256x256.png
+          sips -z 128 128 web/icon-512.png --out packaging/kaiwa.iconset/icon_128x128.png
+          sips -z 64  64  web/icon-512.png --out packaging/kaiwa.iconset/icon_32x32@2x.png
+          sips -z 32  32  web/icon-512.png --out packaging/kaiwa.iconset/icon_32x32.png
+          sips -z 16  16  web/icon-512.png --out packaging/kaiwa.iconset/icon_16x16.png
+          iconutil -c icns packaging/kaiwa.iconset -o packaging/kaiwa.icns
+      - name: Build app bundle
+        run: pyinstaller packaging/kaiwa.spec --noconfirm
+      - name: Package .dmg
+        run: hdiutil create -volname Kaiwa -srcfolder "dist/Kaiwa.app" -ov -format UDZO "Kaiwa-macos.dmg"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kaiwa-macos-dmg
+          path: Kaiwa-macos.dmg
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller pillow
+      - name: Generate .ico icon
+        run: python -c "from PIL import Image; im=Image.open('web/icon-512.png').convert('RGBA'); im.save('packaging/kaiwa.ico', sizes=[(256,256),(128,128),(64,64),(48,48),(32,32),(16,16)])"
+      - name: Build app
+        run: pyinstaller packaging/kaiwa.spec --noconfirm
+      - name: Build installer (Inno Setup)
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF -like 'refs/tags/*') {
+            $env:KAIWA_VERSION = $env:GITHUB_REF_NAME -replace '^v',''
+          } else {
+            $env:KAIWA_VERSION = '${{ github.event.inputs.version }}'
+          }
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" packaging\kaiwa.iss
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kaiwa-windows-exe
+          path: dist_installer/Kaiwa-Setup.exe
+
+  release:
+    needs: [macos, windows]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Publish draft release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          generate_release_notes: true
+          files: |
+            artifacts/kaiwa-macos-dmg/Kaiwa-macos.dmg
+            artifacts/kaiwa-windows-exe/Kaiwa-Setup.exe

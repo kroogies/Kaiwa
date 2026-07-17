@@ -5,7 +5,9 @@ import sqlite3
 import time
 from datetime import date, datetime, timedelta
 
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "kaiwa.db")
+from . import paths
+
+DB_PATH = os.path.join(paths.DATA_DIR, "kaiwa.db")
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS profile (

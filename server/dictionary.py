@@ -7,12 +7,13 @@ import json
 import os
 import sqlite3
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DB = os.path.join(ROOT, "data", "jmdict.db")
+from . import paths
+
+DB = os.path.join(paths.DATA_DIR, "jmdict.db")
 
 
 def _source_json() -> str | None:
-    hits = sorted(glob.glob(os.path.join(ROOT, "models", "jmdict-eng-*.json")))
+    hits = sorted(glob.glob(os.path.join(paths.MODELS_DIR, "jmdict-eng-*.json")))
     return hits[-1] if hits else None
 
 

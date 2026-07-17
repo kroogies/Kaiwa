@@ -5,8 +5,10 @@ import shutil
 import subprocess
 import tempfile
 
+from . import paths
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-MODEL = os.path.join(ROOT, "models", "ggml-small.bin")
+MODEL = os.path.join(paths.MODELS_DIR, "ggml-small.bin")
 _EXE = ".exe" if os.name == "nt" else ""
 
 
