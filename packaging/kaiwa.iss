@@ -13,6 +13,9 @@
 #define MyAppExeName "Kaiwa.exe"
 
 [Setup]
+; This script lives in packaging/, but all its inputs (dist\, packaging\kaiwa.ico)
+; are relative to the repo root — resolve relative paths from there.
+SourceDir=..
 AppId={{B1F9C2A4-3D5E-4F6A-8B7C-9D0E1F2A3B4C}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
