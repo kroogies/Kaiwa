@@ -16,10 +16,10 @@ import requests
 
 from starlette.background import BackgroundTask
 
-from . import backup, db, dictionary, jp, llm, prompts, scenarios, setup, stt, tts
+from . import backup, db, dictionary, jp, llm, paths, prompts, scenarios, setup, stt, tts
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-WEB = os.path.join(ROOT, "web")
+WEB = paths.WEB_DIR
 
 app = FastAPI(title="Kaiwa")
 db.init()

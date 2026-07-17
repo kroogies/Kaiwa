@@ -1,0 +1,51 @@
+"""Filesystem locations for Kaiwa.
+
+In development (running from a git checkout) everything lives under the repo:
+read-only resources and the writable ``data/`` sit side by side, exactly as
+before. When the app is packaged with PyInstaller and installed, the bundle is
+read-only, so writable state — the SQLite DB, TTS cache, built dictionary, and
+any downloaded models — moves to a per-user data directory instead. Read-only
+resources (the web UI and anything bundled) stay inside the app.
+
+Every module resolves its paths through here so the two modes stay consistent.
+"""
+import os
+import sys
+
+FROZEN = getattr(sys, "frozen", False)
+
+
+def _bundle_root() -> str:
+    """Directory holding bundled, read-only resources (web/, vendor/, …)."""
+    if FROZEN:
+        # PyInstaller unpacks bundled data to _MEIPASS (onefile) or leaves it
+        # next to the executable (onedir); _MEIPASS covers both.
+        return getattr(sys, "_MEIPASS", os.path.dirname(sys.executable))
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def _user_data_dir() -> str:
+    """Per-user, writable directory for an installed app."""
+    if sys.platform == "darwin":
+        base = os.path.expanduser("~/Library/Application Support")
+    elif os.name == "nt":
+        base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
+    else:
+        base = os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share")
+    return os.path.join(base, "Kaiwa")
+
+
+# Read-only resources shipped with the app.
+APP_ROOT = _bundle_root()
+WEB_DIR = os.path.join(APP_ROOT, "web")
+
+# Writable per-user state. In dev this stays inside the repo so nothing changes.
+DATA_DIR = _user_data_dir() if FROZEN else os.path.join(APP_ROOT, "data")
+
+# Large models (whisper weights, JMdict source) are NOT shipped in the installer;
+# they download next to the writable data on first use. In dev they sit in the
+# repo's models/ as before.
+MODELS_DIR = os.path.join(DATA_DIR, "models") if FROZEN else os.path.join(APP_ROOT, "models")
+
+os.makedirs(DATA_DIR, exist_ok=True)
+os.makedirs(MODELS_DIR, exist_ok=True)

@@ -10,6 +10,15 @@
 __pycache__/
 *.pyc
 
+# ---- packaging build artifacts (installers are built in CI)
+/build/
+/dist/
+/dist_installer/
+packaging/kaiwa.iconset/
+packaging/kaiwa.icns
+packaging/kaiwa.ico
+*.dmg
+
 # ---- personal notes & local tool state
 /ABOUT-KAIWA.txt
 /.claude/

@@ -14,8 +14,10 @@ import tempfile
 
 import requests
 
+from . import paths
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CACHE = os.path.join(ROOT, "data", "tts_cache")
+CACHE = os.path.join(paths.DATA_DIR, "tts_cache")
 ENGINES = {
     # prefix: (label, base_url) — anything VOICEVOX-API-compatible slots in here
     "vv": ("VOICEVOX", "http://localhost:50021"),
