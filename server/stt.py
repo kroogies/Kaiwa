@@ -7,11 +7,17 @@ import tempfile
 
 from . import paths
 
-MODEL = os.path.join(paths.MODELS_DIR, "ggml-small.bin")
-# Downloaded on first run (see /api/setup/download/whisper). ~465 MB, good
-# accuracy/latency balance for Japanese on CPU-only machines.
-MODEL_URL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin"
+MODEL_NAME = "ggml-small.bin"  # ~465 MB; good accuracy/latency for Japanese on CPU
 _EXE = ".exe" if os.name == "nt" else ""
+
+
+def _model() -> str | None:
+    """Path to the whisper weights: bundled in the app, or a user-dropped copy."""
+    for d in (paths.MODELS_DIR, paths.BUNDLED_MODELS_DIR):
+        p = os.path.join(d, MODEL_NAME)
+        if os.path.exists(p):
+            return p
+    return None
 
 
 def _ensure_exec(path: str) -> None:
@@ -51,7 +57,7 @@ def _bin() -> str | None:
 
 
 def available() -> bool:
-    return _bin() is not None and os.path.exists(MODEL)
+    return _bin() is not None and _model() is not None
 
 
 def transcribe(wav_bytes: bytes, language: str = "ja") -> str:
@@ -60,7 +66,7 @@ def transcribe(wav_bytes: bytes, language: str = "ja") -> str:
         path = f.name
     try:
         proc = subprocess.run(
-            [_bin(), "-m", MODEL, "-f", path, "-l", language,
+            [_bin(), "-m", _model(), "-f", path, "-l", language,
              "-t", "6", "-nt", "--no-prints"],
             capture_output=True, text=True, timeout=120, env=paths.system_env(),
         )

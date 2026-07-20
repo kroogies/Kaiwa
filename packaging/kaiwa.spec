@@ -31,6 +31,12 @@ hiddenimports = ["server.main"]
 for jm in glob.glob(os.path.join(ROOT, "models", "jmdict-eng-*.json")):
     datas.append((jm, "models"))
 
+# whisper STT weights — bundled so speech-to-text works out of the box (no
+# first-run download). Git-ignored; fetched by CI before the build.
+_stt_model = os.path.join(ROOT, "models", "ggml-small.bin")
+if os.path.exists(_stt_model):
+    datas.append((_stt_model, "models"))
+
 # whisper.cpp binary + its shared libraries, staged into vendor/whisper/ by CI
 # (see release.yml / appveyor.yml). Absent for a plain local build, in which
 # case STT falls back to a whisper-cli found on PATH.

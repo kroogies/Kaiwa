@@ -168,9 +168,10 @@
           </label>
           <label>Speech speed <input id="set-speed" type="range" min="0.6" max="1.4" step="0.1"> <span id="speed-val"></span></label>
           <label>Expressiveness <input id="set-intonation" type="range" min="0.5" max="2" step="0.1"> <span id="intonation-val"></span></label>
-          <p class="sub" id="aivis-hint">Want more emotional, anime-style voices? Install
-            <a href="https://aivis-project.com/" target="_blank" rel="noopener">AivisSpeech</a>, add voices from AivisHub,
-            and keep it running — Kaiwa detects it automatically and lists its voices above.</p>
+          <p class="sub" id="aivis-hint">Kaiwa speaks with your system voice by default. Want natural, anime-style
+            Japanese voices? Install <a href="https://voicevox.hiroshiba.jp/" target="_blank" rel="noopener">VOICEVOX</a>
+            or <a href="https://aivis-project.com/" target="_blank" rel="noopener">AivisSpeech</a> and keep it running —
+            Kaiwa detects it automatically and lists its voices above.</p>
           <label class="row"><input type="checkbox" id="set-autoplay"> Auto-play tutor voice</label>
           <label class="row"><input type="checkbox" id="set-autotranslate"> Auto-translate tutor messages</label>
           <button id="save-settings" class="btn primary">Save</button>
@@ -341,36 +342,7 @@
         </div>
       </label>
       <label>Interests (helps Kaiwa pick topics) <input id="ob-interests" placeholder="anime, cooking, football…"></label>
-      <div class="modal-btns"><button class="btn primary" id="ob-start">Next ➤</button></div>
-    </div>
-
-    <!-- STEP 2: voice (optional — speech in & nicer voices out) -->
-    <div id="ob-step-voice" class="hidden">
-      <p class="sub">Kaiwa can hear you and talk back. Both are optional — you can always just type.</p>
-
-      <div class="ob-voice-block">
-        <b><svg class="icon"><use href="/static/icons.svg#mic"/></svg> Talk to Kaiwa (speech-to-text)</b>
-        <p class="sub">Downloads a ~465 MB speech model once, then runs fully offline.</p>
-        <p id="ob-stt-ready" class="sub hidden">✓ Voice input is ready.</p>
-        <button id="ob-stt-btn" class="btn primary">Download voice model</button>
-        <div id="ob-stt-progress" class="hidden">
-          <div class="progress"><div id="ob-stt-fill" class="progress-fill"></div></div>
-          <p id="ob-stt-status" class="sub"></p>
-        </div>
-      </div>
-
-      <div class="ob-voice-block">
-        <b><svg class="icon"><use href="/static/icons.svg#volume-2"/></svg> Nicer voices (optional)</b>
-        <p class="sub">Kaiwa speaks with your system voice by default. For natural, anime-style
-          Japanese voices, install a free engine and keep it running — Kaiwa detects it automatically.</p>
-        <p>
-          <a class="btn" href="https://voicevox.hiroshiba.jp/" target="_blank" rel="noopener">VOICEVOX ↗</a>
-          <a class="btn" href="https://aivis-project.com/" target="_blank" rel="noopener">AivisSpeech ↗</a>
-        </p>
-        <p id="ob-voice-detected" class="sub"></p>
-      </div>
-
-      <div class="modal-btns"><button class="btn primary" id="ob-voice-done">Done ✓</button></div>
+      <div class="modal-btns"><button class="btn primary" id="ob-start">はじめましょう！ Let's go ➤</button></div>
     </div>
   </div>
 </div>

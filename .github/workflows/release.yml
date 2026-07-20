@@ -41,8 +41,10 @@ jobs:
           sips -z 32  32  web/icon-512.png --out packaging/kaiwa.iconset/icon_32x32.png
           sips -z 16  16  web/icon-512.png --out packaging/kaiwa.iconset/icon_16x16.png
           iconutil -c icns packaging/kaiwa.iconset -o packaging/kaiwa.icns
-      - name: Fetch JMdict source (bundled for the offline dictionary)
-        run: python packaging/fetch_jmdict.py
+      - name: Fetch bundled resources (JMdict + whisper model)
+        run: |
+          python packaging/fetch_jmdict.py
+          python packaging/fetch_whisper_model.py
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Bundle whisper.cpp (speech-to-text)
@@ -72,8 +74,10 @@ jobs:
           pip install -r requirements.txt pyinstaller pillow
       - name: Generate .ico icon
         run: python -c "from PIL import Image; im=Image.open('web/icon-512.png').convert('RGBA'); im.save('packaging/kaiwa.ico', sizes=[(256,256),(128,128),(64,64),(48,48),(32,32),(16,16)])"
-      - name: Fetch JMdict source (bundled for the offline dictionary)
-        run: python packaging/fetch_jmdict.py
+      - name: Fetch bundled resources (JMdict + whisper model)
+        run: |
+          python packaging/fetch_jmdict.py
+          python packaging/fetch_whisper_model.py
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Bundle whisper.cpp (speech-to-text)

@@ -114,27 +114,6 @@ async def setup_pull(req: Request):
                                       "X-Accel-Buffering": "no"})
 
 
-@app.post("/api/setup/download/whisper")
-def setup_download_whisper():
-    """SSE stream that downloads the whisper STT model into the user data dir."""
-    from . import downloads
-
-    def gen():
-        try:
-            if os.path.exists(stt.MODEL):
-                yield f"data: {json.dumps({'status': 'success'})}\n\n"
-                return
-            for done, total in downloads.download(stt.MODEL_URL, stt.MODEL):
-                yield f"data: {json.dumps({'completed': done, 'total': total})}\n\n"
-            yield f"data: {json.dumps({'status': 'success'})}\n\n"
-        except Exception as e:
-            yield f"data: {json.dumps({'error': str(e)[:200]})}\n\n"
-
-    return StreamingResponse(gen(), media_type="text/event-stream",
-                             headers={"Cache-Control": "no-cache",
-                                      "X-Accel-Buffering": "no"})
-
-
 @app.get("/api/providers")
 def providers():
     """Provider catalog for the Settings UI (never returns the keys themselves)."""

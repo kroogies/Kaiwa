@@ -121,11 +121,9 @@ async function refreshDueBadge() {
 }
 
 /* ============================================================ onboarding */
-function obShow(step) { // "ai" | "profile" | "voice"
+function obShow(step) { // "ai" | "profile"
   $("#ob-step-ai").classList.toggle("hidden", step !== "ai");
   $("#ob-step-profile").classList.toggle("hidden", step !== "profile");
-  $("#ob-step-voice").classList.toggle("hidden", step !== "voice");
-  if (step === "voice") obVoiceInit();
 }
 
 async function startOnboarding() {
@@ -251,70 +249,6 @@ $("#ob-start").addEventListener("click", async () => {
   const level = $("#ob-level .active")?.dataset.l || "N5";
   const interests = $("#ob-interests").value.trim();
   state.profile = await api.put("/api/profile", { name, jlpt_level: level, interests });
-  obShow("voice");
-});
-
-/* --- step 2: voice (optional — speech in & nicer voices out) --- */
-let obVoicePoll = null;
-async function obVoiceInit() {
-  try {
-    const h = await api.get("/api/health");
-    $("#ob-stt-ready").classList.toggle("hidden", !h.whisper);
-    $("#ob-stt-btn").classList.toggle("hidden", h.whisper);
-    obVoiceDetected(h);
-  } catch {}
-  if (!obVoicePoll) obVoicePoll = setInterval(async () => {
-    try { obVoiceDetected(await api.get("/api/health")); } catch {}
-  }, 4000); // notice a voice engine the moment the user launches it
-}
-function obVoiceDetected(h) {
-  const names = [h.aivis && "AivisSpeech", h.voicevox && "VOICEVOX"].filter(Boolean);
-  $("#ob-voice-detected").textContent = names.length
-    ? `✓ Detected ${names.join(" + ")} — pick its voices in Settings.`
-    : "No voice engine running — using your system voice for now.";
-}
-function obVoiceStop() { if (obVoicePoll) { clearInterval(obVoicePoll); obVoicePoll = null; } }
-
-$("#ob-stt-btn").addEventListener("click", async () => {
-  const btn = $("#ob-stt-btn"), status = $("#ob-stt-status"), fill = $("#ob-stt-fill");
-  btn.disabled = true;
-  $("#ob-stt-progress").classList.remove("hidden");
-  status.textContent = "Starting…";
-  try {
-    const resp = await fetch("/api/setup/download/whisper", { method: "POST" });
-    const reader = resp.body.getReader();
-    const dec = new TextDecoder();
-    let buf = "", ok = false;
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += dec.decode(value, { stream: true });
-      const lines = buf.split("\n\n"); buf = lines.pop();
-      for (const l of lines) {
-        if (!l.startsWith("data: ")) continue;
-        const d = JSON.parse(l.slice(6));
-        if (d.error) throw new Error(d.error);
-        if (d.total && d.completed != null) {
-          const pct = Math.round(d.completed / d.total * 100);
-          fill.style.width = pct + "%";
-          status.textContent = `Downloading — ${pct}%`;
-        }
-        if (d.status === "success") ok = true;
-      }
-    }
-    if (!ok) throw new Error("download did not finish");
-    fill.style.width = "100%";
-    status.textContent = "Done! Voice input is ready.";
-    $("#ob-stt-btn").classList.add("hidden");
-    $("#ob-stt-ready").classList.remove("hidden");
-    updateHealth();
-  } catch (e) {
-    status.textContent = "Download failed: " + e.message;
-    btn.disabled = false;
-  }
-});
-$("#ob-voice-done").addEventListener("click", () => {
-  obVoiceStop();
   $("#onboard-modal").classList.add("hidden");
   loadHome();
 });

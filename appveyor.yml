@@ -22,6 +22,8 @@ build_script:
       # Bundle offline resources (git-ignored, fetched at build time).
       & $py packaging/fetch_jmdict.py
       if ($LASTEXITCODE -ne 0) { throw "jmdict fetch failed" }
+      & $py packaging/fetch_whisper_model.py
+      if ($LASTEXITCODE -ne 0) { throw "whisper model fetch failed" }
       try { & $py packaging/fetch_whisper_win.py } catch { Write-Host "whisper fetch skipped: $_" }
       # Freeze the app (onedir) with PyInstaller.
       & $py -m PyInstaller packaging/kaiwa.spec --noconfirm
