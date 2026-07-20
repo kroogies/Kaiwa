@@ -8,11 +8,32 @@ first launch. This launcher only owns starting the server and opening a browser.
 import multiprocessing
 import os
 import socket
+import sys
 import threading
 import time
 import webbrowser
 
 PORT = int(os.environ.get("KAIWA_PORT", "8130"))
+
+
+def _redirect_output_when_headless() -> None:
+    """A windowed PyInstaller build has no console, so sys.stdout/sys.stderr are
+    None. Anything that touches them crashes — notably uvicorn's log formatter
+    calls sys.stdout.isatty() at startup. Point both at a log file in the user's
+    data dir so logging works and we get a crash trail to debug from.
+    """
+    if sys.stdout is not None and sys.stderr is not None:
+        return  # normal console / dev run — leave streams alone
+    try:
+        from server.paths import DATA_DIR
+        log_path = os.path.join(DATA_DIR, "kaiwa.log")
+    except Exception:
+        log_path = os.path.join(os.path.expanduser("~"), "kaiwa.log")
+    log = open(log_path, "a", buffering=1, encoding="utf-8", errors="replace")
+    if sys.stdout is None:
+        sys.stdout = log
+    if sys.stderr is None:
+        sys.stderr = log
 
 
 def _server_up(port: int) -> bool:
@@ -32,6 +53,7 @@ def _open_browser_when_ready() -> None:
 
 def main() -> None:
     multiprocessing.freeze_support()  # required for frozen apps that may spawn
+    _redirect_output_when_headless()
     if _server_up(PORT):
         # Already running (double-launch) — just focus a tab and exit.
         webbrowser.open(f"http://localhost:{PORT}")

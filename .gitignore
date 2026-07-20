@@ -18,6 +18,7 @@ packaging/kaiwa.iconset/
 packaging/kaiwa.icns
 packaging/kaiwa.ico
 *.dmg
+*.exe
 
 # ---- personal notes & local tool state
 /ABOUT-KAIWA.txt
