@@ -28,6 +28,15 @@ build_script:
       # Freeze the app (onedir) with PyInstaller.
       & $py -m PyInstaller packaging/kaiwa.spec --noconfirm
       if ($LASTEXITCODE -ne 0) { throw "pyinstaller failed" }
+      # VOICEVOX TTS engine (best-effort, ~1.7 GB — never fail the build over it).
+      # Copied into the frozen app AFTER PyInstaller so it isn't repackaged.
+      try {
+        & $py packaging/fetch_voicevox_win.py
+        if (Test-Path vendor\voicevox) {
+          Copy-Item -Recurse -Force vendor\voicevox dist\Kaiwa\_internal\vendor\voicevox
+          Write-Host "VOICEVOX bundled into Windows app"
+        }
+      } catch { Write-Host "VOICEVOX bundling skipped: $_" }
       # Version label: from a git tag (v1.2.3 -> 1.2.3), else the build number.
       if ($env:APPVEYOR_REPO_TAG_NAME) {
         $env:KAIWA_VERSION = $env:APPVEYOR_REPO_TAG_NAME -replace '^v',''

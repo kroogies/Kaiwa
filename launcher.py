@@ -5,15 +5,18 @@ backends (Ollama, VOICEVOX, AivisSpeech) are optional and discovered at runtime
 by the app itself; the onboarding wizard walks the user through AI setup on
 first launch. This launcher only owns starting the server and opening a browser.
 """
+import atexit
 import multiprocessing
 import os
 import socket
+import subprocess
 import sys
 import threading
 import time
 import webbrowser
 
 PORT = int(os.environ.get("KAIWA_PORT", "8130"))
+VOICEVOX_PORT = 50021
 
 
 def _redirect_output_when_headless() -> None:
@@ -42,6 +45,44 @@ def _server_up(port: int) -> bool:
         return s.connect_ex(("127.0.0.1", port)) == 0
 
 
+def _clear_quarantine(path: str) -> None:
+    """A downloaded .app is quarantined; macOS then refuses to launch the nested
+    helper binaries (whisper, the VOICEVOX engine) until the flag is cleared.
+    The main app was already approved by the user, so clear its own bundled
+    tools. Best-effort — a no-op when nothing is quarantined."""
+    if sys.platform == "darwin" and os.path.isdir(path):
+        subprocess.run(["xattr", "-dr", "com.apple.quarantine", path],
+                       capture_output=True)
+
+
+def _start_voicevox() -> None:
+    """Start the bundled VOICEVOX TTS engine if present and not already running.
+
+    The engine is a VOICEVOX-protocol server on :50021 (~20s boot); tts.py picks
+    it up automatically once it answers. Absent in a dev checkout (run.sh starts
+    it there) and when the engine wasn't bundled for this platform."""
+    from server import paths
+    engine_dir = os.path.join(paths.VENDOR_DIR, "voicevox")
+    exe = os.path.join(engine_dir, "run.exe" if os.name == "nt" else "run")
+    if not os.path.exists(exe) or _server_up(VOICEVOX_PORT):
+        return
+    _clear_quarantine(engine_dir)
+    try:
+        os.chmod(exe, os.stat(exe).st_mode | 0o111)
+    except OSError:
+        pass
+    try:
+        # The engine resolves its models/resources relative to its own directory.
+        proc = subprocess.Popen(
+            [exe, "--host", "127.0.0.1", "--port", str(VOICEVOX_PORT)],
+            cwd=engine_dir, env=paths.system_env(),
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        atexit.register(lambda: proc.terminate())
+    except Exception:
+        pass
+
+
 def _open_browser_when_ready() -> None:
     # A cold first start (imports + DB init) can take a while on slow machines.
     for _ in range(120):
@@ -58,6 +99,9 @@ def main() -> None:
         # Already running (double-launch) — just focus a tab and exit.
         webbrowser.open(f"http://localhost:{PORT}")
         return
+    from server import paths
+    _clear_quarantine(paths.VENDOR_DIR)  # un-quarantine bundled whisper + voicevox helpers
+    threading.Thread(target=_start_voicevox, daemon=True).start()  # ~20s boot, don't block
     threading.Thread(target=_open_browser_when_ready, daemon=True).start()
     import uvicorn
     from server.main import app

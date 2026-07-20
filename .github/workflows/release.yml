@@ -53,6 +53,14 @@ jobs:
           bash packaging/stage_whisper.sh vendor/whisper
       - name: Build app bundle
         run: pyinstaller packaging/kaiwa.spec --noconfirm
+      - name: Bundle VOICEVOX (if engine staged; copied post-build so it isn't repackaged)
+        run: |
+          if [ -d vendor/voicevox ]; then
+            cp -R vendor/voicevox "dist/Kaiwa.app/Contents/Frameworks/vendor/voicevox"
+            echo "VOICEVOX bundled into the .app"
+          else
+            echo "no staged VOICEVOX engine — skipping (built locally for releases)"
+          fi
       - name: Package .dmg
         run: hdiutil create -volname Kaiwa -srcfolder "dist/Kaiwa.app" -ov -format UDZO "Kaiwa-macos.dmg"
       - uses: actions/upload-artifact@v4
@@ -87,6 +95,15 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build app
         run: pyinstaller packaging/kaiwa.spec --noconfirm
+      - name: Bundle VOICEVOX (best-effort, ~1.7 GB; copied post-build)
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          python packaging/fetch_voicevox_win.py
+          if (Test-Path vendor\voicevox) {
+            Copy-Item -Recurse -Force vendor\voicevox dist\Kaiwa\_internal\vendor\voicevox
+            Write-Host "VOICEVOX bundled into the Windows app"
+          }
       - name: Build installer (Inno Setup)
         shell: pwsh
         run: |
