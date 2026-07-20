@@ -20,6 +20,7 @@ permissions:
 jobs:
   macos:
     runs-on: macos-13   # Intel (x64) runner — matches Kaiwa's documented target
+    timeout-minutes: 40  # fail fast instead of hanging to the 24h ceiling
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -59,6 +60,7 @@ jobs:
 
   windows:
     runs-on: windows-latest
+    timeout-minutes: 40  # fail fast instead of hanging to the 24h ceiling
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

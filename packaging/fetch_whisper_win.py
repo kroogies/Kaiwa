@@ -15,17 +15,29 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEST = os.path.join(ROOT, "vendor", "whisper")
 API = "https://api.github.com/repos/ggml-org/whisper.cpp/releases/latest"
 ASSET = "whisper-bin-x64.zip"  # plain CPU build (BLAS/cuBLAS variants are far larger)
+# Fallback when the API is unauthenticated + rate-limited (e.g. AppVeyor).
+PINNED = f"https://github.com/ggml-org/whisper.cpp/releases/download/v1.9.1/{ASSET}"
+
+
+def latest_url() -> str:
+    headers = {"Accept": "application/vnd.github+json"}
+    if os.environ.get("GITHUB_TOKEN"):
+        headers["Authorization"] = f"Bearer {os.environ['GITHUB_TOKEN']}"
+    data = requests.get(API, headers=headers, timeout=60).json()
+    if not isinstance(data, dict) or "assets" not in data:
+        raise RuntimeError(f"unexpected API response: {str(data)[:150]}")
+    return next(a["browser_download_url"] for a in data["assets"] if a["name"] == ASSET)
 
 
 def main() -> None:
     os.makedirs(DEST, exist_ok=True)
-    headers = {"Accept": "application/vnd.github+json"}
-    if os.environ.get("GITHUB_TOKEN"):
-        headers["Authorization"] = f"Bearer {os.environ['GITHUB_TOKEN']}"
-    rel = requests.get(API, headers=headers, timeout=60).json()
-    asset = next(a for a in rel["assets"] if a["name"] == ASSET)
-    print(f"downloading {asset['name']} ({asset['size'] // 1048576} MB)")
-    data = requests.get(asset["browser_download_url"], timeout=600).content
+    try:
+        url = latest_url()
+    except Exception as e:
+        print(f"API lookup failed ({e}); using pinned release")
+        url = PINNED
+    print(f"downloading {url.rsplit('/', 1)[-1]}")
+    data = requests.get(url, timeout=600).content
     with zipfile.ZipFile(io.BytesIO(data)) as z:
         z.extractall(DEST)
     print("extracted into", DEST)

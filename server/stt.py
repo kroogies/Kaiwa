@@ -25,21 +25,28 @@ def _ensure_exec(path: str) -> None:
 
 
 def _bin() -> str | None:
-    """whisper.cpp CLI: env override → binary bundled in the app → PATH."""
+    """whisper.cpp CLI: env override → PATH install → binary bundled in the app.
+
+    A PATH install (e.g. Homebrew — reachable in the frozen app because paths.py
+    puts Homebrew back on PATH) is preferred because it's self-consistent with
+    its own ggml backend libraries. The bundled binary is the fallback for a
+    plain install with no whisper.cpp on the system. (Mixing the two — e.g. the
+    bundled binary loading a Homebrew machine's ggml backends — can pull in two
+    copies of libomp and crash, so we never straddle the two.)
+    """
     env = os.environ.get("KAIWA_WHISPER_BIN")
     if env and (os.path.exists(env) or shutil.which(env)):
         return env
-    # Prefer the binary shipped inside the app so a plain install just works.
+    for name in ("whisper-cli", "whisper-cpp"):
+        p = shutil.which(name)
+        if p:
+            return p
     for name in (f"whisper-cli{_EXE}", f"main{_EXE}"):
         for sub in ("", "Release"):  # windows release zips sometimes nest a Release/ dir
             cand = os.path.join(paths.VENDOR_DIR, "whisper", sub, name)
             if os.path.exists(cand):
                 _ensure_exec(cand)
                 return cand
-    for name in ("whisper-cli", "whisper-cpp"):  # else fall back to a PATH install
-        p = shutil.which(name)
-        if p:
-            return p
     return None
 
 
