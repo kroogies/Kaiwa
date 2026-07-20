@@ -5,6 +5,7 @@ Run from the repo root:  pyinstaller packaging/kaiwa.spec
 Produces dist/Kaiwa.app on macOS and dist/Kaiwa/ (onedir) on Windows.
 The .dmg / .exe installers are wrapped around those by the CI workflow.
 """
+import glob
 import os
 import sys
 
@@ -24,6 +25,18 @@ ROOT = os.path.abspath(os.path.join(SPECPATH, os.pardir))
 datas = [(os.path.join(ROOT, "web"), "web")]
 binaries = []
 hiddenimports = ["server.main"]
+
+# JMdict dictionary source — bundled so word lookups work offline from first run.
+# (The built SQLite db is generated in the writable user data dir at runtime.)
+for jm in glob.glob(os.path.join(ROOT, "models", "jmdict-eng-*.json")):
+    datas.append((jm, "models"))
+
+# whisper.cpp binary + its shared libraries, staged into vendor/whisper/ by CI
+# (see release.yml / appveyor.yml). Absent for a plain local build, in which
+# case STT falls back to a whisper-cli found on PATH.
+_whisper = os.path.join(ROOT, "vendor", "whisper")
+if os.path.isdir(_whisper):
+    datas.append((_whisper, os.path.join("vendor", "whisper")))
 
 # Packages that ship data files or use dynamic imports PyInstaller can miss.
 for pkg in ("unidic_lite", "fugashi", "pykakasi", "jaconv"):

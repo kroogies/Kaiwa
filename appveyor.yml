@@ -19,6 +19,10 @@ build_script:
       # App icon from the PNG.
       & $py -c "from PIL import Image; im=Image.open('web/icon-512.png').convert('RGBA'); im.save('packaging/kaiwa.ico', sizes=[(256,256),(128,128),(64,64),(48,48),(32,32),(16,16)])"
       if ($LASTEXITCODE -ne 0) { throw "icon generation failed" }
+      # Bundle offline resources (git-ignored, fetched at build time).
+      & $py packaging/fetch_jmdict.py
+      if ($LASTEXITCODE -ne 0) { throw "jmdict fetch failed" }
+      try { & $py packaging/fetch_whisper_win.py } catch { Write-Host "whisper fetch skipped: $_" }
       # Freeze the app (onedir) with PyInstaller.
       & $py -m PyInstaller packaging/kaiwa.spec --noconfirm
       if ($LASTEXITCODE -ne 0) { throw "pyinstaller failed" }

@@ -64,7 +64,8 @@ def list_voices() -> list:
             pass
     if IS_MAC:
         try:
-            out = subprocess.run(["say", "-v", "?"], capture_output=True, text=True, timeout=10).stdout
+            out = subprocess.run(["say", "-v", "?"], capture_output=True, text=True,
+                                 timeout=10, env=paths.system_env()).stdout
             for line in out.splitlines():
                 if "ja_JP" in line:
                     name = line.split()[0]
@@ -88,6 +89,7 @@ def _sapi_voices() -> list:
     try:
         out = subprocess.run(["powershell", "-NoProfile", "-Command", script],
                              capture_output=True, text=True, timeout=15,
+                             env=paths.system_env(),
                              creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)).stdout
         return [tuple(line.split("|", 1)) for line in out.splitlines() if "|" in line]
     except Exception:
@@ -176,7 +178,7 @@ def _sapi(text: str, name: str, speed: float) -> bytes:
             "$s.Speak($t); $s.Dispose()"
         )
         subprocess.run(["powershell", "-NoProfile", "-Command", script],
-                       check=True, timeout=60,
+                       check=True, timeout=60, env=paths.system_env(),
                        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         with open(wav, "rb") as f:
             return f.read()
@@ -187,9 +189,10 @@ def _say(text: str, name: str, speed: float) -> bytes:
     with tempfile.TemporaryDirectory() as d:
         aiff = os.path.join(d, "t.aiff")
         wav = os.path.join(d, "t.wav")
+        env = paths.system_env()
         subprocess.run(["say", "-v", name, "-r", str(rate), "-o", aiff, text],
-                       check=True, timeout=60)
+                       check=True, timeout=60, env=env)
         subprocess.run(["afconvert", "-f", "WAVE", "-d", "LEI16@22050", aiff, wav],
-                       check=True, timeout=60)
+                       check=True, timeout=60, env=env)
         with open(wav, "rb") as f:
             return f.read()

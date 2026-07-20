@@ -453,6 +453,10 @@ ruby rt { font-size: .5em; color: var(--accent); font-weight: 600; }
 .setup-opt small { color: var(--sub); }
 .progress { height: 10px; border-radius: 999px; background: var(--border); overflow: hidden; margin: 12px 0 6px; }
 .progress-fill { height: 100%; width: 0%; background: var(--accent); border-radius: 999px; transition: width .3s; }
+.ob-voice-block { padding: 14px 0; border-top: 1px solid var(--border); }
+.ob-voice-block:first-of-type { border-top: none; }
+.ob-voice-block b { display: flex; align-items: center; gap: 8px; }
+.ob-voice-block .icon { width: 1.3em; height: 1.3em; color: var(--indigo); }
 
 /* ------------------------------------------------- session reports */
 .session-item.expandable { cursor: pointer; }

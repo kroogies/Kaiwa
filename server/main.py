@@ -74,6 +74,7 @@ def health():
         "whisper": stt.available(),
         "voicevox": tts.voicevox_up(),
         "aivis": tts.engine_up("aivis"),
+        "os_voice": tts.IS_MAC or tts.IS_WINDOWS,  # built-in say / SAPI fallback
         "tokenizer": jp.backend_name(),
         "dictionary": dictionary.available(),
     }
@@ -105,6 +106,27 @@ async def setup_pull(req: Request):
                 for line in r.iter_lines():
                     if line:
                         yield f"data: {line.decode()}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)[:200]})}\n\n"
+
+    return StreamingResponse(gen(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache",
+                                      "X-Accel-Buffering": "no"})
+
+
+@app.post("/api/setup/download/whisper")
+def setup_download_whisper():
+    """SSE stream that downloads the whisper STT model into the user data dir."""
+    from . import downloads
+
+    def gen():
+        try:
+            if os.path.exists(stt.MODEL):
+                yield f"data: {json.dumps({'status': 'success'})}\n\n"
+                return
+            for done, total in downloads.download(stt.MODEL_URL, stt.MODEL):
+                yield f"data: {json.dumps({'completed': done, 'total': total})}\n\n"
+            yield f"data: {json.dumps({'status': 'success'})}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'error': str(e)[:200]})}\n\n"
 

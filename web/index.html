@@ -153,6 +153,7 @@
           </label>
           <label>Interests <input id="set-interests" type="text" placeholder="anime, cooking, travel…"></label>
           <label>Goals <input id="set-goals" type="text" placeholder="trip to Japan in spring…"></label>
+          <button id="rerun-setup" class="btn" type="button" style="margin-top:8px">Re-run setup wizard</button>
         </div>
         <div class="card">
           <h3><svg class="icon"><use href="/static/icons.svg#sparkles"/></svg> AI</h3>
@@ -340,7 +341,36 @@
         </div>
       </label>
       <label>Interests (helps Kaiwa pick topics) <input id="ob-interests" placeholder="anime, cooking, football…"></label>
-      <div class="modal-btns"><button class="btn primary" id="ob-start">はじめましょう！ Let's go ➤</button></div>
+      <div class="modal-btns"><button class="btn primary" id="ob-start">Next ➤</button></div>
+    </div>
+
+    <!-- STEP 2: voice (optional — speech in & nicer voices out) -->
+    <div id="ob-step-voice" class="hidden">
+      <p class="sub">Kaiwa can hear you and talk back. Both are optional — you can always just type.</p>
+
+      <div class="ob-voice-block">
+        <b><svg class="icon"><use href="/static/icons.svg#mic"/></svg> Talk to Kaiwa (speech-to-text)</b>
+        <p class="sub">Downloads a ~465 MB speech model once, then runs fully offline.</p>
+        <p id="ob-stt-ready" class="sub hidden">✓ Voice input is ready.</p>
+        <button id="ob-stt-btn" class="btn primary">Download voice model</button>
+        <div id="ob-stt-progress" class="hidden">
+          <div class="progress"><div id="ob-stt-fill" class="progress-fill"></div></div>
+          <p id="ob-stt-status" class="sub"></p>
+        </div>
+      </div>
+
+      <div class="ob-voice-block">
+        <b><svg class="icon"><use href="/static/icons.svg#volume-2"/></svg> Nicer voices (optional)</b>
+        <p class="sub">Kaiwa speaks with your system voice by default. For natural, anime-style
+          Japanese voices, install a free engine and keep it running — Kaiwa detects it automatically.</p>
+        <p>
+          <a class="btn" href="https://voicevox.hiroshiba.jp/" target="_blank" rel="noopener">VOICEVOX ↗</a>
+          <a class="btn" href="https://aivis-project.com/" target="_blank" rel="noopener">AivisSpeech ↗</a>
+        </p>
+        <p id="ob-voice-detected" class="sub"></p>
+      </div>
+
+      <div class="modal-btns"><button class="btn primary" id="ob-voice-done">Done ✓</button></div>
     </div>
   </div>
 </div>

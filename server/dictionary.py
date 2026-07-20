@@ -13,8 +13,12 @@ DB = os.path.join(paths.DATA_DIR, "jmdict.db")
 
 
 def _source_json() -> str | None:
-    hits = sorted(glob.glob(os.path.join(paths.MODELS_DIR, "jmdict-eng-*.json")))
-    return hits[-1] if hits else None
+    # Ships bundled inside the installed app (paths.BUNDLED_MODELS_DIR); in dev
+    # both dirs point at the repo's models/. A user-dropped copy wins if present.
+    hits = []
+    for d in (paths.MODELS_DIR, paths.BUNDLED_MODELS_DIR):
+        hits += glob.glob(os.path.join(d, "jmdict-eng-*.json"))
+    return sorted(hits)[-1] if hits else None
 
 
 def available() -> bool:

@@ -7,25 +7,39 @@ import tempfile
 
 from . import paths
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODEL = os.path.join(paths.MODELS_DIR, "ggml-small.bin")
+# Downloaded on first run (see /api/setup/download/whisper). ~465 MB, good
+# accuracy/latency balance for Japanese on CPU-only machines.
+MODEL_URL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin"
 _EXE = ".exe" if os.name == "nt" else ""
 
 
+def _ensure_exec(path: str) -> None:
+    """PyInstaller's data copy can drop the executable bit — put it back."""
+    if os.name == "nt":
+        return
+    try:
+        os.chmod(path, os.stat(path).st_mode | 0o111)
+    except OSError:
+        pass
+
+
 def _bin() -> str | None:
-    """whisper.cpp CLI: env override → PATH → binaries dropped in vendor/whisper/."""
+    """whisper.cpp CLI: env override → binary bundled in the app → PATH."""
     env = os.environ.get("KAIWA_WHISPER_BIN")
     if env and (os.path.exists(env) or shutil.which(env)):
         return env
-    for name in ("whisper-cli", "whisper-cpp"):
+    # Prefer the binary shipped inside the app so a plain install just works.
+    for name in (f"whisper-cli{_EXE}", f"main{_EXE}"):
+        for sub in ("", "Release"):  # windows release zips sometimes nest a Release/ dir
+            cand = os.path.join(paths.VENDOR_DIR, "whisper", sub, name)
+            if os.path.exists(cand):
+                _ensure_exec(cand)
+                return cand
+    for name in ("whisper-cli", "whisper-cpp"):  # else fall back to a PATH install
         p = shutil.which(name)
         if p:
             return p
-    for name in (f"whisper-cli{_EXE}", f"main{_EXE}"):
-        for sub in ("", "Release"):  # windows release zips sometimes nest a Release/ dir
-            cand = os.path.join(ROOT, "vendor", "whisper", sub, name)
-            if os.path.exists(cand):
-                return cand
     return None
 
 
@@ -41,7 +55,7 @@ def transcribe(wav_bytes: bytes, language: str = "ja") -> str:
         proc = subprocess.run(
             [_bin(), "-m", MODEL, "-f", path, "-l", language,
              "-t", "6", "-nt", "--no-prints"],
-            capture_output=True, text=True, timeout=120,
+            capture_output=True, text=True, timeout=120, env=paths.system_env(),
         )
         text = proc.stdout.strip()
         # strip bracketed non-speech artifacts like [音楽], (笑い)
